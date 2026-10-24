@@ -18,14 +18,13 @@ Hauptfunktionen:
 3. Pinbelegung – XIAO ESP32-S3
 Signal	XIAO Pin	Beschreibung
 Taster	GPIO9	Haupttaster gegen GND
-Pieper	GPIO10	Piezo-Buzzer
+Pieper	GPIO8	Piezo-Buzzer
 Display CS	GPIO3	SPI Chip Select
-Display DC	GPIO4	SPI Data/Command
-Display SDA/MOSI	GPIO1	SPI MOSI
-Display SCL	GPIO2	SPI Clock
-Display Reset	GPIO43	Reset Display
-AHT20 SDA	GPIO5	I²C Daten
-AHT20 SCL	GPIO6	I²C Clock
+Display DC	GPIO43	SPI Data/Command
+Display MOSI	GPIO5	SPI MOSI
+Display SCLK	GPIO4	SPI Clock
+AHT20 SDA	GPIO6	I²C Daten
+AHT20 SCL	GPIO7	I²C Clock
 VBAT_ADC	GPIO1 (ADC)	Akkuspannungsmessung
 MEAS_EN	GPIO2	Aktiviert Spannungsteiler
 HOLD_NODE	GPIO44	Selbsthaltung aktiv
@@ -39,19 +38,32 @@ Wichtig:
 - Vor dem Abschalten muss Display / WLAN sauber beendet werden
 
 5. Akku-Messung
-Die Akkuspannung wird über einen hochohmigen Spannungsteiler gemessen.
-
-- R10: 1 MΩ
-- R11: 330 kΩ
-- Q10 (2N7002) schaltet den Teiler
+Die Akkuspannung wird über einen schaltbaren Spannungsteiler an GPIO1 gemessen.
+Der aktuelle Kalibrierfaktor für die verbaute Widerstandsbeschaltung ist
+5,0303.
 
 Ablauf:
 1. MEAS_EN = HIGH
 2. kurze Stabilisierung (~5 ms)
-3. ADC messen
+3. ADC achtmal messen und mitteln
 4. MEAS_EN = LOW
 
 Dies minimiert den Ruhestromverbrauch.
+
+Die Firmware bildet aus acht ADC-Messungen einen Mittelwert und berechnet
+`batteryVoltage = adcVoltage * 5.0303`. Die angezeigte Prozentzahl ist eine
+Näherung aus der Zellspannung.
+
+Zur Fehlersuche gibt der serielle Monitor (115200 Baud) alle fünf Sekunden
+Rohwert-Minimum/-Maximum, ADC-Spannung und berechnete Akkuspannung aus.
+`OUT_OF_RANGE` bedeutet, dass die berechnete Spannung außerhalb von 2,5 bis
+4,5 V liegt; bei einem Rohwert von 0 sind GPIO1, MEAS_EN (GPIO2) und Masse
+zu prüfen. MEAS_EN wird nur während der Messung auf HIGH gesetzt.
+
+USB-CDC ist in PlatformIO aktiviert (`ARDUINO_USB_MODE=1` und
+`ARDUINO_USB_CDC_ON_BOOT=1`). Nach dem Flashen das Gerät zurücksetzen und im
+seriellen Monitor den USB-COM-Port der laufenden Anwendung bei 115200 Baud
+öffnen. Der Port im Bootloader-Modus kann davon abweichen.
 6. Programmierhinweise (Firmware)
 Empfohlene Struktur:
 - State-Machine (BOOT, IDLE, UI, RUN, SHUTDOWN)
@@ -70,4 +82,3 @@ Abschalten:
 - Serielle Ausgabe nur im Debug-Build
 - GPIO44 nicht während Flash-Vorgang aktiv halten
 - Bei Problemen: Selbsthaltung testweise deaktivieren
-
