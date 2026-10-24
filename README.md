@@ -17,7 +17,7 @@ ist eine Schätzung aus der Zellspannung.
 
 ## Versionierung
 
-Schema `MAJOR.MINOR.PATCH`, die Version steht oben in `TasterDemo.ino`
+Schema `MAJOR.MINOR.PATCH`, die Version steht oben in `src/config.h`
 (`FW_VERSION_MAJOR/MINOR/PATCH`) und erscheint auf dem Startbildschirm sowie
 beim Start im seriellen Monitor.
 
@@ -26,7 +26,29 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.3.0`.
+Aktuell: `v0.4.0`.
+
+## Projektstruktur
+
+Eine Firmware, aufgeteilt in Module unter [`src/`](src):
+
+| Datei | Aufgabe |
+|---|---|
+| `main.cpp` | Ablauf und Wechsel der Ansichten |
+| `config.h` | Pins, Zeiten, Farben, Layout, Version, Akkufaktor |
+| `measurements.*` | **Messwerte**: Temperatur, Luftfeuchte, Akku |
+| `display.*` | Display, Bildspeicher, untere Leiste |
+| `screens.*` | Ansichten (Splash, Zuordnung) |
+| `button.*`, `beep.*` | Taster mit Entprellung, Piezo |
+
+Geplante Module (noch nicht angelegt, je ein eigener Minor-Schritt):
+
+1. **Datenaustausch**: Startkarten
+2. **Zuordnung**: Tasterzuordnung und Rolle
+3. **Zeit**: Zeitstempel und Berechnungen
+4. **Zeitsync**: Zeitsynchronisierung
+5. **Backup**: Stempel-Backup
+6. **Netzwerk**: WLAN-Management
 
 ## Akku-Messung prüfen
 
