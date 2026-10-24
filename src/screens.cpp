@@ -62,8 +62,10 @@ uint16_t drawAssign(char letter, const measure::Data& m) {
 
 #if VBAT_SCREEN_DEBUG
   char dbg[40];
+  snprintf(dbg, sizeof(dbg), "Akku %.2f V", m.vbatCalc);
+  printCentered(dbg, 192);
   snprintf(dbg, sizeof(dbg), "raw %lu  adc %.3fV", (unsigned long)m.rawAverage, m.adcVoltage);
-  printCentered(dbg, 205);
+  printCentered(dbg, 208);
 #endif
 
   display::renderBottomBar(bg, letter, m);

@@ -15,7 +15,8 @@ struct Data {
   bool ahtOk = false;
   float temperature = NAN;
   float humidity = NAN;
-  float vbat = NAN;
+  float vbat = NAN;    // nur gueltige Werte, sonst NAN
+  float vbatCalc = 0;  // immer die errechnete Spannung (zum Gegenmessen)
   uint8_t vbatLevel = 0;  // 0..4 fuer das Akku-Icon
   uint8_t vbatPercent = 0;
   uint32_t rawAverage = 0;
