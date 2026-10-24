@@ -4,8 +4,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 4
-#define FW_VERSION_PATCH 1
+#define FW_VERSION_MINOR 5
+#define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -73,6 +73,27 @@ struct Timing {
   static constexpr uint32_t VBAT_POLL_MS = 5000;
   static constexpr uint32_t VBAT_SETTLE_MS = 5;
   static constexpr uint8_t VBAT_SAMPLE_COUNT = 8;
+};
+
+// Schnittstelle zum Pi (nur internes WLAN/LAN, siehe README "Taster <-> Pi Schnittstelle")
+struct Net {
+  static constexpr const char* WIFI_SSID = "Stoppuhr";
+  static constexpr const char* WIFI_PASS = "";
+  // Statische Pi-IP (kein DNS noetig); auch als NTP-Quelle fuer den Zeitstempel
+  static constexpr const char* PI_BASE_URL = "http://192.168.178.50:8000";
+  static constexpr const char* NTP_SERVER = "192.168.178.50";
+  // Leer: MAC des ESP32 wird verwendet
+  static constexpr const char* DEVICE_MAC = "";
+  // Leer: kein X-Api-Key-Header
+  static constexpr const char* API_KEY = "";
+  static constexpr uint32_t HTTP_TIMEOUT_MS = 1500;
+  static constexpr uint8_t RETRY_COUNT = 3;
+  static constexpr uint32_t RETRY_BACKOFF_MS = 200;
+  static constexpr bool ENABLE_OFFLINE_QUEUE = true;
+  static constexpr size_t QUEUE_MAX = 32;
+  static constexpr uint32_t TRIGGER_MIN_INTERVAL_MS = 300;
+  static constexpr uint32_t FLUSH_RETRY_MS = 3000;
+  static constexpr uint32_t WIFI_RETRY_MS = 5000;
 };
 
 // Kalibrierfaktor Akku-Spannungsteiler: Akkuspannung = ADC-Spannung * VBAT_SCALE

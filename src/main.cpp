@@ -12,6 +12,7 @@
 #include "config.h"
 #include "display.h"
 #include "measurements.h"
+#include "netlink.h"
 #include "screens.h"
 
 namespace {
@@ -39,6 +40,7 @@ void setup() {
   button::begin();
   beep::begin();
   measure::begin();
+  netlink::begin();
   display::begin();
 
   uiMode = UiMode::SPLASH;
@@ -48,7 +50,10 @@ void setup() {
 
 void loop() {
   beep::tick();
-  if (button::pressed()) beep::click();
+  if (button::pressed()) {
+    beep::click();
+    netlink::sendTrigger();
+  }
 
   uint8_t changed = measure::update();
   const measure::Data& m = measure::data();
