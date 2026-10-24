@@ -20,6 +20,14 @@
 
 #define DBG 1
 
+// Versionsschema: MAJOR.MINOR.PATCH (siehe README)
+#define FW_VERSION_MAJOR 0
+#define FW_VERSION_MINOR 3
+#define FW_VERSION_PATCH 0
+#define FW_STR_(x) #x
+#define FW_STR(x) FW_STR_(x)
+#define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
+
 namespace cfg {
 
 struct Pins {
@@ -71,9 +79,10 @@ struct Layout {
 
 struct Timing {
   static constexpr uint32_t DEBOUNCE_MS = 40;
-  static constexpr uint32_t SPLASH_MS = 2500;
+  static constexpr uint32_t SPLASH_MS = 5000;
   static constexpr uint32_t AHT_POLL_MS = 2000;
   static constexpr uint8_t AHT_FAIL_REINIT_AFTER = 3;
+  static constexpr uint8_t AHT_FAIL_CLEAR_AFTER = 5;
   static constexpr uint32_t VBAT_POLL_MS = 5000;
   static constexpr uint32_t VBAT_SETTLE_MS = 5;
   static constexpr uint8_t VBAT_SAMPLE_COUNT = 8;
@@ -100,6 +109,8 @@ struct AppState {
   uint8_t vbatLevel = 0;
   uint32_t lastVbatMs = 0;
   bool batteryNeedsRender = false;
+  uint32_t dbgRaw = 0;
+  float dbgAdc = 0;
 
   bool lastRead = true;
   bool stable = true;
@@ -176,7 +187,9 @@ static void tick() {
 }
 }
 
-static constexpr float VBAT_SCALE = 5.0303f;
+static constexpr float VBAT_SCALE = 2.382f;
+// 1: Akku-Rohwerte klein auf dem Display anzeigen (zur Fehlersuche)
+#define VBAT_SCREEN_DEBUG 1
 
 struct BatteryReading {
   uint32_t rawAverage;
@@ -222,10 +235,19 @@ static void pollBattery() {
   S.lastVbatMs = now;
 
   BatteryReading reading = readBatteryVoltage();
-  S.vbat = reading.valid ? reading.batteryVoltage : NAN;
-  S.vbatLevel = vbatToLevel0to4(S.vbat);
-  S.batteryNeedsRender = true;
-  S.bottomBarNeedsRender = true;
+  float newVbat = reading.valid ? reading.batteryVoltage : NAN;
+  uint8_t newLevel = vbatToLevel0to4(newVbat);
+  bool changed = isfinite(newVbat) != isfinite(S.vbat)
+    || vbatToPercent(newVbat) != vbatToPercent(S.vbat)
+    || newLevel != S.vbatLevel;
+#if VBAT_SCREEN_DEBUG
+  changed = changed || S.dbgRaw != reading.rawAverage;
+#endif
+  S.vbat = newVbat;
+  S.vbatLevel = newLevel;
+  S.dbgRaw = reading.rawAverage;
+  S.dbgAdc = reading.adcVoltage;
+  if (changed) S.batteryNeedsRender = true;
 
 #if DBG
   Serial.printf(
@@ -292,28 +314,44 @@ static void pollAht() {
     && temperature.temperature <= 85.0f;
 
   if (valid) {
-    S.humidity = humidity.relative_humidity;
-    S.temperature = temperature.temperature;
+    float newTemp = temperature.temperature;
+    float newHum = humidity.relative_humidity;
+    bool changed = !isfinite(S.temperature) || !isfinite(S.humidity)
+      || lroundf(newTemp * 10) != lroundf(S.temperature * 10)
+      || lroundf(newHum) != lroundf(S.humidity);
+    S.humidity = newHum;
+    S.temperature = newTemp;
     S.aht_fail = 0;
+    if (changed) S.bottomBarNeedsRender = true;
+    return;
   } else {
-    S.humidity = NAN;
-    S.temperature = NAN;
     ++S.aht_fail;
+    if (S.aht_fail >= cfg::Timing::AHT_FAIL_CLEAR_AFTER) {
+      S.humidity = NAN;
+      S.temperature = NAN;
+      S.bottomBarNeedsRender = true;
+    }
 #if DBG
     Serial.println("[AHT] invalid reading");
 #endif
     if (S.aht_fail >= cfg::Timing::AHT_FAIL_REINIT_AFTER) reinitializeAht();
   }
-  S.bottomBarNeedsRender = true;
+}
+
+static GFXcanvas16 canvas(cfg::Screen::W, cfg::Screen::H);
+
+static void flushCanvas() {
+  if (!canvas.getBuffer()) return;
+  tft.drawRGBBitmap(0, 0, canvas.getBuffer(), cfg::Screen::W, cfg::Screen::H);
 }
 
 static void drawBatteryIcon(int16_t x, int16_t y, uint8_t level, uint16_t fg, uint16_t bg) {
   if (level > 4) level = 4;
 
-  tft.drawRect(x, y - cfg::Layout::BAT_H, cfg::Layout::BAT_W, cfg::Layout::BAT_H, fg);
-  tft.fillRect(x + cfg::Layout::BAT_W, y - cfg::Layout::BAT_H + 3,
+  canvas.drawRect(x, y - cfg::Layout::BAT_H, cfg::Layout::BAT_W, cfg::Layout::BAT_H, fg);
+  canvas.fillRect(x + cfg::Layout::BAT_W, y - cfg::Layout::BAT_H + 3,
                2, cfg::Layout::BAT_H - 6, fg);
-  tft.fillRect(x + 1, y - cfg::Layout::BAT_H + 1,
+  canvas.fillRect(x + 1, y - cfg::Layout::BAT_H + 1,
                cfg::Layout::BAT_W - 2, cfg::Layout::BAT_H - 2, bg);
 
   const int innerW = cfg::Layout::BAT_W - 2;
@@ -324,7 +362,7 @@ static void drawBatteryIcon(int16_t x, int16_t y, uint8_t level, uint16_t fg, ui
   int sh = cfg::Layout::BAT_H - 2;
 
   for (int i = 0; i < 4; ++i) {
-    if (i < level) tft.fillRect(sx, sy, segW, sh, fg);
+    if (i < level) canvas.fillRect(sx, sy, segW, sh, fg);
     sx += segW + segGap;
   }
 }
@@ -333,7 +371,7 @@ static void drawWifiBarsDummy(int16_t x, int16_t y) {
   const int barW = 5, spacing = 3, baseH = 6, step = 6;
   for (int i = 0; i < 4; ++i) {
     int h = baseH + i * step;
-    tft.fillRect(x + i * (barW + spacing), y - h, barW, h, cfg::Colors::GREY);
+    canvas.fillRect(x + i * (barW + spacing), y - h, barW, h, cfg::Colors::GREY);
   }
 }
 
@@ -355,19 +393,19 @@ static void renderBottomBar(uint16_t accent) {
   int currentBottom = rectTop + rectH - 1;
   if (neededBottom > currentBottom) rectH = (neededBottom - rectTop) + 1;
 
-  tft.fillRect(cfg::Screen::SAFE, rectTop,
+  canvas.fillRect(cfg::Screen::SAFE, rectTop,
                cfg::Screen::W - 2 * cfg::Screen::SAFE, rectH, accent);
   drawBatteryIcon(cfg::Layout::BAT_X, cfg::Layout::BAT_Y,
                   S.vbatLevel, cfg::Colors::GREY, accent);
   drawWifiBarsDummy(cfg::Layout::WIFI_LEFT_X, cfg::Layout::WIFI_BARS_Y);
 
   String text = bottomText();
-  tft.setFont(&FreeSans9pt7b);
-  tft.setTextColor(cfg::Colors::GREY);
+  canvas.setFont(&FreeSans9pt7b);
+  canvas.setTextColor(cfg::Colors::GREY);
 
   int16_t xb, yb;
   uint16_t textW, textH;
-  tft.getTextBounds(text, 0, 0, &xb, &yb, &textW, &textH);
+  canvas.getTextBounds(text, 0, 0, &xb, &yb, &textW, &textH);
 
   int leftLimit = cfg::Screen::SAFE + 4;
   int rightLimit = cfg::Layout::BAT_X - 6;
@@ -381,28 +419,29 @@ static void renderBottomBar(uint16_t accent) {
   int bottomLimit = rectTop + rectH - 1;
   if (baseline > bottomLimit) baseline = bottomLimit;
 
-  tft.setCursor(x, baseline);
-  tft.print(text);
+  canvas.setCursor(x, baseline);
+  canvas.print(text);
+  flushCanvas();
 }
 
 static void drawSplash() {
-  tft.fillScreen(cfg::Colors::SPLASH);
-  tft.setTextColor(cfg::Colors::WHITE);
-  tft.setFont(&FreeSans12pt7b);
+  canvas.fillScreen(cfg::Colors::SPLASH);
+  canvas.setTextColor(cfg::Colors::WHITE);
+  canvas.setFont(&FreeSans12pt7b);
 
   const String title = "Stoppuhr 2.0";
   int16_t xb, yb;
   uint16_t w, h;
-  tft.getTextBounds(title, 0, 0, &xb, &yb, &w, &h);
-  tft.setCursor((cfg::Screen::W - (int)w) / 2, 120);
-  tft.print(title);
+  canvas.getTextBounds(title, 0, 0, &xb, &yb, &w, &h);
+  canvas.setCursor((cfg::Screen::W - (int)w) / 2, 120);
+  canvas.print(title);
 
-  tft.setTextColor(cfg::Colors::SUB);
-  tft.setFont(&FreeSans9pt7b);
-  const String subtitle = "Demo Flow";
-  tft.getTextBounds(subtitle, 0, 0, &xb, &yb, &w, &h);
-  tft.setCursor((cfg::Screen::W - (int)w) / 2, 160);
-  tft.print(subtitle);
+  canvas.setTextColor(cfg::Colors::SUB);
+  canvas.setFont(&FreeSans9pt7b);
+  const String subtitle = FW_VERSION;
+  canvas.getTextBounds(subtitle, 0, 0, &xb, &yb, &w, &h);
+  canvas.setCursor((cfg::Screen::W - (int)w) / 2, 160);
+  canvas.print(subtitle);
 
   renderBottomBar(cfg::Colors::SPLASH);
 }
@@ -412,29 +451,37 @@ static void drawAssign() {
   uint16_t bg = isfinite(S.vbat) ? bgFromPercent(percent) : cfg::Colors::PREP_BG;
   S.assignBg = bg;
 
-  tft.fillScreen(bg);
-  tft.setTextColor(cfg::Colors::WHITE);
+  canvas.fillScreen(bg);
+  canvas.setTextColor(cfg::Colors::WHITE);
 
   String percentText = isfinite(S.vbat) ? String(percent) + "%" : "--%";
-  tft.setFont(&FreeSans12pt7b);
+  canvas.setFont(&FreeSans12pt7b);
   int16_t xb, yb;
   uint16_t w, h;
-  tft.getTextBounds(percentText, 0, 0, &xb, &yb, &w, &h);
-  tft.setCursor((cfg::Screen::W - (int)w) / 2, cfg::Layout::ASSIGN_PCT_BASELINE_Y);
-  tft.print(percentText);
+  canvas.getTextBounds(percentText, 0, 0, &xb, &yb, &w, &h);
+  canvas.setCursor((cfg::Screen::W - (int)w) / 2, cfg::Layout::ASSIGN_PCT_BASELINE_Y);
+  canvas.print(percentText);
 
   char letter[2] = {S.assignLetter, 0};
-  tft.setFont(&FreeSans24pt7b);
-  tft.getTextBounds(letter, 0, 0, &xb, &yb, &w, &h);
-  tft.setCursor((cfg::Screen::W - (int)w) / 2, cfg::Layout::ASSIGN_LETTER_BASELINE_Y);
-  tft.print(letter);
+  canvas.setFont(&FreeSans24pt7b);
+  canvas.getTextBounds(letter, 0, 0, &xb, &yb, &w, &h);
+  canvas.setCursor((cfg::Screen::W - (int)w) / 2, cfg::Layout::ASSIGN_LETTER_BASELINE_Y);
+  canvas.print(letter);
 
-  tft.setFont(&FreeSans9pt7b);
-  tft.setTextColor(cfg::Colors::GREY);
+  canvas.setFont(&FreeSans9pt7b);
+  canvas.setTextColor(cfg::Colors::GREY);
   const String hint = "Taste: Starter";
-  tft.getTextBounds(hint, 0, 0, &xb, &yb, &w, &h);
-  tft.setCursor((cfg::Screen::W - (int)w) / 2, 230);
-  tft.print(hint);
+  canvas.getTextBounds(hint, 0, 0, &xb, &yb, &w, &h);
+  canvas.setCursor((cfg::Screen::W - (int)w) / 2, 230);
+  canvas.print(hint);
+
+#if VBAT_SCREEN_DEBUG
+  char dbg[40];
+  snprintf(dbg, sizeof(dbg), "raw %lu  adc %.3fV", (unsigned long)S.dbgRaw, S.dbgAdc);
+  canvas.getTextBounds(dbg, 0, 0, &xb, &yb, &w, &h);
+  canvas.setCursor((cfg::Screen::W - (int)w) / 2, 205);
+  canvas.print(dbg);
+#endif
 
   renderBottomBar(bg);
 }
@@ -459,6 +506,9 @@ static void handleButton() {
 void setup() {
   Serial.begin(115200);
   delay(50);
+#if DBG
+  Serial.println("Stoppuhr 2.0 " FW_VERSION);
+#endif
 
   pinMode(cfg::Pins::HOLD, OUTPUT);
   digitalWrite(cfg::Pins::HOLD, HIGH);
@@ -482,6 +532,10 @@ void setup() {
   tft.init(cfg::Screen::W, cfg::Screen::H);
   tft.setRotation(0);
   tft.setTextWrap(false);
+  canvas.setTextWrap(false);
+#if DBG
+  Serial.printf("[GFX] canvas buffer=%s\n", canvas.getBuffer() ? "OK" : "FAIL");
+#endif
 
   S.lastVbatMs = millis() - cfg::Timing::VBAT_POLL_MS;
   S.lastAhtMs = millis() - cfg::Timing::AHT_POLL_MS;

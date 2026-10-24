@@ -12,8 +12,21 @@ Taster, Piezo-Buzzer und schaltbarem Akku-Spannungsteiler. Die verbindliche
 Pinbelegung steht in [`docs/Programmier_Informationen`](docs/Programmier_Informationen).
 
 Die Firmware mittelt acht ADC-Messungen und rechnet die ADC-Spannung mit dem
-aktuell kalibrierten Faktor `5.0303` in die Akkuspannung um. Der Prozentwert
+aktuell kalibrierten Faktor `2.382` in die Akkuspannung um. Der Prozentwert
 ist eine Schätzung aus der Zellspannung.
+
+## Versionierung
+
+Schema `MAJOR.MINOR.PATCH`, die Version steht oben in `TasterDemo.ino`
+(`FW_VERSION_MAJOR/MINOR/PATCH`) und erscheint auf dem Startbildschirm sowie
+beim Start im seriellen Monitor.
+
+- **PATCH**: Fehlerkorrekturen, Kalibrierwerte (z. B. Akkufaktor)
+- **MINOR**: neue Funktionen oder Ansichten, abwärtskompatibel
+- **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
+
+Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
+Aktuell: `v0.3.0`.
 
 ## Akku-Messung prüfen
 

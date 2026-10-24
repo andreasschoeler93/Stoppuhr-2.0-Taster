@@ -40,7 +40,7 @@ Wichtig:
 5. Akku-Messung
 Die Akkuspannung wird über einen schaltbaren Spannungsteiler an GPIO1 gemessen.
 Der aktuelle Kalibrierfaktor für die verbaute Widerstandsbeschaltung ist
-5,0303.
+2.382.
 
 Ablauf:
 1. MEAS_EN = HIGH
@@ -51,7 +51,7 @@ Ablauf:
 Dies minimiert den Ruhestromverbrauch.
 
 Die Firmware bildet aus acht ADC-Messungen einen Mittelwert und berechnet
-`batteryVoltage = adcVoltage * 5.0303`. Die angezeigte Prozentzahl ist eine
+`batteryVoltage = adcVoltage * 2.382`. Die angezeigte Prozentzahl ist eine
 Näherung aus der Zellspannung.
 
 Zur Fehlersuche gibt der serielle Monitor (115200 Baud) alle fünf Sekunden
