@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "measurements.h"
 
 namespace netlink {
 namespace {
@@ -79,6 +80,38 @@ int postTrigger(const Event& e, int64_t ts) {
   return code;
 }
 
+// Vitaldaten (Messwerte) senden. Fehlschlaege werden verworfen, der naechste Wert kommt bald.
+void postVitals() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  const measure::Data m = measure::data();
+  char body[256];
+  char t[16], h[16];
+  if (m.ahtOk && isfinite(m.temperature) && isfinite(m.humidity)) {
+    snprintf(t, sizeof(t), "%.1f", m.temperature);
+    snprintf(h, sizeof(h), "%.1f", m.humidity);
+  } else {
+    strcpy(t, "null");
+    strcpy(h, "null");
+  }
+  snprintf(body, sizeof(body),
+           "{\"mac\":\"%s\",\"fw\":\"%s\",\"temp_c\":%s,\"humidity\":%s,"
+           "\"vbat\":%.2f,\"battery_pct\":%u,\"rssi\":%d,\"uptime_s\":%lu}",
+           deviceMac.c_str(), FW_VERSION, t, h, m.vbatCalc, (unsigned)m.vbatPercent,
+           WiFi.RSSI(), (unsigned long)(millis() / 1000));
+
+  HTTPClient http;
+  http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  if (!http.begin(String(cfg::Net::PI_BASE_URL) + "/api/vitals")) return;
+  http.addHeader("Content-Type", "application/json");
+  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  int code = http.POST(body);
+  http.end();
+#if DBG
+  Serial.printf("[NET] vitals http=%d\n", code);
+#endif
+}
+
 // Eine Zustellung mit Retry/Backoff. true: Event erledigt (entfernen).
 bool deliver(const Event& e) {
   int64_t ts = epochMsFor(e.pressMs);
@@ -111,6 +144,7 @@ bool deliver(const Event& e) {
 
 void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
+  uint32_t lastVitalsMs = 0;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
       lastWifiTryMs = millis();
@@ -129,6 +163,10 @@ void netTask(void*) {
         vTaskDelay(pdMS_TO_TICKS(cfg::Net::FLUSH_RETRY_MS));
       }
     } else {
+      if (millis() - lastVitalsMs >= cfg::Net::VITALS_INTERVAL_MS) {
+        lastVitalsMs = millis();
+        postVitals();
+      }
       vTaskDelay(pdMS_TO_TICKS(20));
     }
   }

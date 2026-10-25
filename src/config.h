@@ -116,6 +116,7 @@ struct Net {
   static constexpr size_t QUEUE_MAX = 32;
   static constexpr uint32_t TRIGGER_MIN_INTERVAL_MS = 300;
   static constexpr uint32_t FLUSH_RETRY_MS = 3000;
+  static constexpr uint32_t VITALS_INTERVAL_MS = 10000;
   static constexpr uint32_t WIFI_RETRY_MS = 5000;
 };
 

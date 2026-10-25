@@ -31,6 +31,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global count
+        if self.path == "/api/vitals":
+            raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            try:
+                d = json.loads(raw)
+                print(
+                    f"[{datetime.now():%H:%M:%S}] Vitaldaten {d['mac']}: "
+                    f"{d['temp_c']} C, {d['humidity']} %, Akku {d['vbat']} V "
+                    f"({d['battery_pct']} %), WLAN {d['rssi']} dBm, fw {d['fw']}"
+                )
+            except (ValueError, KeyError, TypeError):
+                print(f"Vitaldaten ungueltig: {raw[:80]!r}")
+            self._reply(200, {"ok": True})
+            return
         if self.path != "/api/triggers":
             self._reply(404, {"ok": False, "error": "not found", "code": "NOT_FOUND"})
             return
