@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "display.h"
+#include "netlink.h"
 
 namespace screens {
 namespace {
@@ -66,6 +67,9 @@ uint16_t drawAssign(char letter, const measure::Data& m) {
   printCentered(dbg, 192);
   snprintf(dbg, sizeof(dbg), "raw %lu  adc %.3fV", (unsigned long)m.rawAverage, m.adcVoltage);
   printCentered(dbg, 208);
+  if (netlink::wifiLevel()) snprintf(dbg, sizeof(dbg), "WLAN %d dBm", netlink::wifiRssi());
+  else snprintf(dbg, sizeof(dbg), "WLAN offline");
+  printCentered(dbg, 176);
 #endif
 
   display::renderBottomBar(bg, letter, m);

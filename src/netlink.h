@@ -11,5 +11,9 @@ void begin();
 // Gibt false zurueck, wenn er durch Entprellung verworfen wurde.
 bool sendTrigger();
 size_t queued();
+// 0 = nicht verbunden, 1..4 = Signalstaerke
+uint8_t wifiLevel();
+// Signalstaerke in dBm (0, wenn nicht verbunden)
+int wifiRssi();
 
 }  // namespace netlink

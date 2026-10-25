@@ -5,6 +5,7 @@
 #include <Fonts/FreeSans9pt7b.h>
 
 #include "config.h"
+#include "netlink.h"
 
 namespace display {
 namespace {
@@ -39,11 +40,13 @@ void drawBatteryIcon(int16_t x, int16_t y, uint8_t level, uint16_t fg, uint16_t 
   }
 }
 
-void drawWifiBarsDummy(int16_t x, int16_t y) {
+void drawWifiBars(int16_t x, int16_t y, uint8_t level) {
   const int barW = 5, spacing = 3, baseH = 6, step = 6;
   for (int i = 0; i < 4; ++i) {
     int h = baseH + i * step;
-    gfx.fillRect(x + i * (barW + spacing), y - h, barW, h, cfg::Colors::GREY);
+    int bx = x + i * (barW + spacing);
+    if (i < level) gfx.fillRect(bx, y - h, barW, h, cfg::Colors::GREY);
+    else gfx.drawRect(bx, y - h, barW, h, cfg::Colors::GREY);
   }
 }
 
@@ -91,7 +94,7 @@ void renderBottomBar(uint16_t accent, char letter, const measure::Data& m) {
                cfg::Screen::W - 2 * cfg::Screen::SAFE, rectH, accent);
   drawBatteryIcon(cfg::Layout::BAT_X, cfg::Layout::BAT_Y,
                   m.vbatLevel, cfg::Colors::GREY, accent);
-  drawWifiBarsDummy(cfg::Layout::WIFI_LEFT_X, cfg::Layout::WIFI_BARS_Y);
+  drawWifiBars(cfg::Layout::WIFI_LEFT_X, cfg::Layout::WIFI_BARS_Y, netlink::wifiLevel());
 
   String text = bottomText(letter, m);
   gfx.setFont(&FreeSans9pt7b);

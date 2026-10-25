@@ -175,4 +175,15 @@ bool sendTrigger() {
 
 size_t queued() { return qCount; }
 
+int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
+
+uint8_t wifiLevel() {
+  if (WiFi.status() != WL_CONNECTED) return 0;
+  int rssi = WiFi.RSSI();
+  if (rssi >= -55) return 4;
+  if (rssi >= -65) return 3;
+  if (rssi >= -75) return 2;
+  return 1;
+}
+
 }  // namespace netlink

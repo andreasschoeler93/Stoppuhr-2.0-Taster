@@ -56,6 +56,16 @@ void loop() {
   }
 
   uint8_t changed = measure::update();
+  static uint8_t lastWifiLevel = 0xFF;
+  static uint32_t lastWifiCheckMs = 0;
+  if (millis() - lastWifiCheckMs >= 2000) {
+    lastWifiCheckMs = millis();
+    uint8_t lvl = netlink::wifiLevel();
+    if (lvl != lastWifiLevel) {
+      lastWifiLevel = lvl;
+      changed |= measure::CHANGED_BATTERY;
+    }
+  }
   const measure::Data& m = measure::data();
 
   if (uiMode == UiMode::SPLASH) {
