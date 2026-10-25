@@ -19,6 +19,10 @@
 #ifndef SECRET_API_KEY
 #define SECRET_API_KEY ""
 #endif
+// Zeitquelle (SNTP). Standard: der Pi. Fuer Tests am PC z. B. "pool.ntp.org".
+#ifndef SECRET_NTP_SERVER
+#define SECRET_NTP_SERVER SECRET_PI_IP
+#endif
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
@@ -100,7 +104,7 @@ struct Net {
   static constexpr const char* WIFI_PASS = SECRET_WIFI_PASS;
   // Statische Pi-IP (kein DNS noetig); auch als NTP-Quelle fuer den Zeitstempel
   static constexpr const char* PI_BASE_URL = "http://" SECRET_PI_IP ":8000";
-  static constexpr const char* NTP_SERVER = SECRET_PI_IP;
+  static constexpr const char* NTP_SERVER = SECRET_NTP_SERVER;
   // Leer: MAC des ESP32 wird verwendet
   static constexpr const char* DEVICE_MAC = "";
   // Leer: kein X-Api-Key-Header

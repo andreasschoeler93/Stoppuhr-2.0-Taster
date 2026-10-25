@@ -6,3 +6,5 @@
 #define SECRET_WIFI_PASS "WLAN-Passwort"
 #define SECRET_PI_IP "192.168.178.50"
 #define SECRET_API_KEY ""
+// Optional, nur fuer Tests am PC (der PC bietet keinen NTP-Dienst an):
+// #define SECRET_NTP_SERVER "pool.ntp.org"

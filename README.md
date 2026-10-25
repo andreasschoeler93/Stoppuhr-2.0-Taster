@@ -105,6 +105,24 @@ Fehler: `{"ok":false,"error":"...","code":"..."}`.
 3. Taster drücken, im seriellen Monitor `action=sent` prüfen; Pi abschalten →
    `buffered`, wieder einschalten → Queue wird in Reihenfolge geleert.
 
+### Test ohne Pi: Simulation am PC
+
+Der Taster hängt dafür im normalen Heim-WLAN, der PC spielt den Pi:
+
+1. In `src/secrets.h` eintragen: das Heim-WLAN (SSID/Passwort), als `SECRET_PI_IP`
+   die IP des PCs (`ipconfig`) und `#define SECRET_NTP_SERVER "pool.ntp.org"`
+   (der PC bietet keinen NTP-Dienst an, der Taster holt die Uhrzeit aus dem Internet).
+2. Test-Server starten (Python von PlatformIO, nichts zu installieren):
+   `& 'C:\Users\<name>\.platformio\penv\Scripts\python.exe' tools\mock_pi.py`
+3. Windows-Firewall: beim ersten Start „Zugriff zulassen" bestätigen (privates Netz), sonst erreicht der Taster den PC nicht.
+4. Flashen, Taster drücken: Im Server-Fenster erscheint z. B.
+   `#1 -> 200 mac=… Tastendruck=11:43:06.123 (vor 41 ms)`.
+
+Fehlerfälle testen: `--fail-every 3` (jede 3. Anfrage 503 → Retry),
+`--offline-s 30` (Server antwortet 30 s nicht → Events werden gepuffert und
+danach in Reihenfolge nachgesendet). Zurück zum Pi: `SECRET_PI_IP`/`SECRET_NTP_SERVER`
+und WLAN-Daten wieder auf den Pi stellen.
+
 ## Akku-Messung prüfen
 
 PlatformIO-Seriellen Monitor mit `115200` Baud öffnen:
