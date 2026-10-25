@@ -35,7 +35,7 @@
 // 1: serielle Debug-Ausgabe
 #define DBG 1
 // 1: Akku-Rohwerte klein auf dem Display anzeigen (zur Fehlersuche)
-#define VBAT_SCREEN_DEBUG 1
+#define VBAT_SCREEN_DEBUG 0
 
 namespace cfg {
 
