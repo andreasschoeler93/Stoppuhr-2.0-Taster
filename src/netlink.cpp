@@ -35,9 +35,11 @@ bool peek(Event& e) {
   return ok;
 }
 
-void pop() {
+// Entfernt den Kopf nur, wenn es noch das gesendete Event ist. Lief die Queue
+// waehrend des Sendens voll, wurde der Kopf bereits verworfen.
+void popIfHead(uint32_t id) {
   portENTER_CRITICAL(&qMux);
-  if (qCount) {
+  if (qCount && queue[qHead].id == id) {
     qHead = (qHead + 1) % cfg::Net::QUEUE_MAX;
     qCount--;
   }
@@ -119,10 +121,10 @@ void netTask(void*) {
     if (peek(e)) {
       // Reihenfolge bleibt erhalten: nur der Kopf wird gesendet.
       if (deliver(e)) {
-        pop();
+        popIfHead(e.id);
       } else if (!cfg::Net::ENABLE_OFFLINE_QUEUE) {
         logLine(e.id, 0, 0, "dropped");
-        pop();
+        popIfHead(e.id);
       } else {
         vTaskDelay(pdMS_TO_TICKS(cfg::Net::FLUSH_RETRY_MS));
       }
@@ -137,6 +139,9 @@ void netTask(void*) {
 void begin() {
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
+  // Verstecktes WLAN: alle Kanaele absuchen, bester Empfang zuerst
+  WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+  WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
   deviceMac = cfg::Net::DEVICE_MAC[0] ? String(cfg::Net::DEVICE_MAC) : WiFi.macAddress();
   WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
   configTime(0, 0, cfg::Net::NTP_SERVER);

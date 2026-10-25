@@ -2,6 +2,24 @@
 
 #include <Arduino.h>
 
+// Zugangsdaten stehen in src/secrets.h (nicht im Repository, siehe
+// src/secrets.example.h). Ohne diese Datei gelten die Platzhalter unten.
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
+#ifndef SECRET_WIFI_SSID
+#define SECRET_WIFI_SSID "Stoppuhr"
+#endif
+#ifndef SECRET_WIFI_PASS
+#define SECRET_WIFI_PASS ""
+#endif
+#ifndef SECRET_PI_IP
+#define SECRET_PI_IP "192.168.178.50"
+#endif
+#ifndef SECRET_API_KEY
+#define SECRET_API_KEY ""
+#endif
+
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 5
@@ -77,15 +95,16 @@ struct Timing {
 
 // Schnittstelle zum Pi (nur internes WLAN/LAN, siehe README "Taster <-> Pi Schnittstelle")
 struct Net {
-  static constexpr const char* WIFI_SSID = "Stoppuhr";
-  static constexpr const char* WIFI_PASS = "";
+  // Das WLAN des Pi ist versteckt und passwortgeschuetzt (Werte aus secrets.h)
+  static constexpr const char* WIFI_SSID = SECRET_WIFI_SSID;
+  static constexpr const char* WIFI_PASS = SECRET_WIFI_PASS;
   // Statische Pi-IP (kein DNS noetig); auch als NTP-Quelle fuer den Zeitstempel
-  static constexpr const char* PI_BASE_URL = "http://192.168.178.50:8000";
-  static constexpr const char* NTP_SERVER = "192.168.178.50";
+  static constexpr const char* PI_BASE_URL = "http://" SECRET_PI_IP ":8000";
+  static constexpr const char* NTP_SERVER = SECRET_PI_IP;
   // Leer: MAC des ESP32 wird verwendet
   static constexpr const char* DEVICE_MAC = "";
   // Leer: kein X-Api-Key-Header
-  static constexpr const char* API_KEY = "";
+  static constexpr const char* API_KEY = SECRET_API_KEY;
   static constexpr uint32_t HTTP_TIMEOUT_MS = 1500;
   static constexpr uint8_t RETRY_COUNT = 3;
   static constexpr uint32_t RETRY_BACKOFF_MS = 200;
