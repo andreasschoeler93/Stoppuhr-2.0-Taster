@@ -3,6 +3,8 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <esp_mac.h>
+#include <esp_sntp.h>
+#include <esp_timer.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -14,7 +16,7 @@ namespace {
 
 struct Event {
   uint32_t id;
-  uint32_t pressMs;
+  int64_t pressUs;
 };
 
 Event queue[cfg::Net::QUEUE_MAX];
@@ -58,13 +60,15 @@ void logLine(uint32_t id, int attempt, int status, const char* action) {
 #endif
 }
 
-// Epoch-Zeit in ms zum Zeitpunkt des Tastendrucks; 0, wenn Uhr noch nicht synchron.
-int64_t epochMsFor(uint32_t pressMs) {
+// Epoch-Zeit in ms zum Zeitpunkt des Tastendrucks (in Mikrosekunden gerechnet, dann gerundet);
+// 0, wenn Uhr noch nicht synchron.
+int64_t epochMsFor(int64_t pressUs) {
+  int64_t espNow = esp_timer_get_time();
   struct timeval tv;
   gettimeofday(&tv, nullptr);
   if (tv.tv_sec < 1700000000) return 0;
-  int64_t now = (int64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-  return now - (int64_t)(uint32_t)(millis() - pressMs);
+  int64_t nowUs = (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+  return (nowUs - (espNow - pressUs) + 500) / 1000;
 }
 
 // Rueckgabe: HTTP-Status oder <=0 bei Netzwerkfehler/Timeout.
@@ -102,7 +106,7 @@ void postVitals() {
   // ts fehlt absichtlich, der Server setzt dann die Empfangszeit.
   // clock_ms (Uhr des Tasters, nur wenn synchron) dient dem Server, den Uhrversatz auszugleichen.
   char clock[40] = "";
-  int64_t nowEpoch = epochMsFor(millis());
+  int64_t nowEpoch = epochMsFor(esp_timer_get_time());
   if (nowEpoch != 0) snprintf(clock, sizeof(clock), ",\"clock_ms\":%llu", (unsigned long long)nowEpoch);
   snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
@@ -250,7 +254,7 @@ uint8_t pollDisplay() {
 
 // Eine Zustellung mit Retry/Backoff. true: Event erledigt (entfernen).
 bool deliver(const Event& e) {
-  int64_t ts = epochMsFor(e.pressMs);
+  int64_t ts = epochMsFor(e.pressUs);
   if (ts == 0 || WiFi.status() != WL_CONNECTED) return false;
   uint32_t backoff = cfg::Net::RETRY_BACKOFF_MS;
   for (int attempt = 1; attempt <= cfg::Net::RETRY_COUNT; attempt++) {
@@ -352,11 +356,13 @@ void begin() {
   Serial.printf("[NET] mac=%s name=%s\n", deviceMac.c_str(), deviceName.c_str());
 #endif
   WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
+  // Haeufiger abgleichen als der Standard (1 h), damit die Quarz-Drift klein bleibt
+  sntp_set_sync_interval(cfg::Net::NTP_SYNC_INTERVAL_MS);
   configTime(0, 0, cfg::Net::NTP_SERVER);
   xTaskCreate(netTask, "netlink", 8192, nullptr, 1, nullptr);
 }
 
-bool sendTrigger() {
+bool sendTrigger(int64_t pressUs) {
   uint32_t now = millis();
   if (haveTrigger && now - lastTriggerMs < cfg::Net::TRIGGER_MIN_INTERVAL_MS) return false;
   haveTrigger = true;
@@ -372,7 +378,7 @@ bool sendTrigger() {
     dropped = true;
   }
   if (cfg::Net::ENABLE_OFFLINE_QUEUE || qCount == 0) {
-    queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, now};
+    queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, pressUs};
     qCount++;
     queuedOk = true;
   }

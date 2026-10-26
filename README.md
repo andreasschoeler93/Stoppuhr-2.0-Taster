@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.8.1`.
+Aktuell: `v0.8.2`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -44,7 +44,7 @@ Eine Firmware, aufgeteilt in Module unter [`src/`](src):
 | `display.*` | Display, Bildspeicher, untere Leiste |
 | `screens.*` | Ansichten (Splash, Zuordnung) |
 | `netlink.*` | WLAN-Client: Trigger an den Pi senden, Offline-Queue |
-| `button.*`, `beep.*` | Taster mit Entprellung, Piezo |
+| `button.*`, `beep.*` | Taster (Flanken-Interrupt mit Entprellung), Piezo |
 
 Geplante Module (noch nicht angelegt, je ein eigener Minor-Schritt):
 
@@ -100,7 +100,17 @@ unteren Leiste; bis zur Anmeldung steht dort `?`. Danach sendet er alle 10 s
 `{"mac","battery"(%),"temp","humidity","vbat"(V),"rssi","fw","uptime_s","clock_ms"}`;
 `ts` fehlt, der Server setzt die Empfangszeit. `clock_ms` ist die Uhrzeit des Tasters
 (Epoch in ms, nur wenn per NTP synchron). Daraus bestimmt der Server den Versatz
-zur eigenen Uhr und gleicht die Zeitstempel der Tastendrücke damit aus.
+zur eigenen Uhr. Er gleicht die Zeitstempel nur bei grober Abweichung (> 250 ms) aus;
+kleinere Versätze sind Netzlatenz und würden die Zeiten verfälschen.
+
+### Zeitgenauigkeit
+
+- Der Zeitstempel eines Tastendrucks stammt aus einem Interrupt auf der fallenden Flanke
+  (`esp_timer`, Mikrosekunden) und nicht aus dem `loop()`; Entprellung und Display-Zeichnen
+  verzögern ihn nicht. Gesendet wird er in ms (gerundet).
+- SNTP gleicht alle `NTP_SYNC_INTERVAL_MS` (30 s) mit dem Pi ab, damit der Quarz nicht driftet.
+- Im Betrieb muss der Pi ein NTP-Server sein (z. B. chrony, `allow` für das Taster-WLAN) und
+  der Stoppuhr-Server dieselbe Uhr nutzen. Dann liegt der Fehler im niedrigen ms-Bereich.
 
 ### Rollenansichten (Start / Bahn)
 

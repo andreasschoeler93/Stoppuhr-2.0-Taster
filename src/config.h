@@ -27,7 +27,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 8
-#define FW_VERSION_PATCH 1
+#define FW_VERSION_PATCH 2
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -126,6 +126,7 @@ struct Net {
   // Statische Pi-IP (kein DNS noetig); auch als NTP-Quelle fuer den Zeitstempel
   static constexpr const char* PI_BASE_URL = "http://" SECRET_PI_IP ":1999";
   static constexpr const char* NTP_SERVER = SECRET_NTP_SERVER;
+  static constexpr uint32_t NTP_SYNC_INTERVAL_MS = 30000;
   // Leer: MAC des ESP32 wird verwendet
   static constexpr const char* DEVICE_MAC = "";
   // Anzeigename im Server; leer = "T-" + letzte 3 MAC-Bytes

@@ -5,28 +5,41 @@
 namespace button {
 namespace {
 
-bool lastRead = true;
-bool stable = true;
-uint32_t lastChangeMs = 0;
+// Zeitstempel kommt direkt aus der Flanke (Interrupt), nicht aus dem loop().
+volatile int64_t lastEdgeUs = 0;
+volatile int64_t pressUs = 0;
+volatile bool pending = false;
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
+// Eine fallende Flanke zaehlt nur nach Ruhe auf der Leitung (Entprellung);
+// jede Flanke, auch das Loslassen, startet die Ruhezeit neu.
+void IRAM_ATTR onEdge() {
+  int64_t now = esp_timer_get_time();
+  bool low = digitalRead(cfg::Pins::BUTTON) == LOW;
+  if (low && now - lastEdgeUs >= (int64_t)cfg::Timing::DEBOUNCE_MS * 1000 && !pending) {
+    pressUs = now;
+    pending = true;
+  }
+  lastEdgeUs = now;
+}
 
 }  // namespace
 
 void begin() {
   pinMode(cfg::Pins::BUTTON, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(cfg::Pins::BUTTON), onEdge, CHANGE);
 }
 
-bool pressed() {
-  bool readNow = digitalRead(cfg::Pins::BUTTON);
-  if (readNow != lastRead) {
-    lastRead = readNow;
-    lastChangeMs = millis();
+bool pressed(int64_t* pressTimeUs) {
+  bool hit = false;
+  portENTER_CRITICAL(&mux);
+  if (pending) {
+    pending = false;
+    if (pressTimeUs) *pressTimeUs = pressUs;
+    hit = true;
   }
-
-  if (millis() - lastChangeMs >= cfg::Timing::DEBOUNCE_MS && readNow != stable) {
-    stable = readNow;
-    return !stable;
-  }
-  return false;
+  portEXIT_CRITICAL(&mux);
+  return hit;
 }
 
 }  // namespace button

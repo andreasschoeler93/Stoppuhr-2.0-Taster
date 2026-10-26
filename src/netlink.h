@@ -9,7 +9,8 @@ namespace netlink {
 void begin();
 // Legt einen Trigger in die Warteschlange (nicht blockierend).
 // Gibt false zurueck, wenn er durch Entprellung verworfen wurde.
-bool sendTrigger();
+// pressUs: esp_timer-Zeit (Mikrosekunden) des Tastendrucks.
+bool sendTrigger(int64_t pressUs);
 size_t queued();
 // 0 = nicht verbunden, 1..4 = Signalstaerke
 uint8_t wifiLevel();

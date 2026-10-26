@@ -52,9 +52,10 @@ void setup() {
 
 void loop() {
   beep::tick();
-  if (button::pressed()) {
+  int64_t pressUs = 0;
+  if (button::pressed(&pressUs)) {
+    netlink::sendTrigger(pressUs);
     beep::click();
-    netlink::sendTrigger();
   }
 
   uint8_t changed = measure::update();
