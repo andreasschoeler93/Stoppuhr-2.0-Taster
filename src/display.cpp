@@ -90,6 +90,14 @@ void flush() {
   tft.drawRGBBitmap(0, 0, gfx.getBuffer(), cfg::Screen::W, cfg::Screen::H);
 }
 
+void flushRows(int y, int h) {
+  if (!displayReady) return;
+  if (y < 0) y = 0;
+  if (y + h > cfg::Screen::H) h = cfg::Screen::H - y;
+  if (h <= 0) return;
+  tft.drawRGBBitmap(0, y, gfx.getBuffer() + (size_t)y * cfg::Screen::W, cfg::Screen::W, h);
+}
+
 void renderBottomBar(uint16_t accent, char letter, const measure::Data& m) {
   if (!displayReady) return;
 

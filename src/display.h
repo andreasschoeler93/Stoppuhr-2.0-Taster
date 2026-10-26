@@ -12,6 +12,8 @@ void begin();
 bool ready();
 GFXcanvas16& canvas();
 void flush();
+// Uebertraegt nur die Zeilen y..y+h-1 des Bildspeichers (schnell, fuer die laufende Uhr).
+void flushRows(int y, int h);
 
 // Untere Leiste mit Temperatur, Luftfeuchte, Buchstabe, Akku-Icon und WLAN.
 // Uebertraegt das Bild am Ende selbst.

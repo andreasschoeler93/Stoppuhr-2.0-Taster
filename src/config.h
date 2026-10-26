@@ -26,8 +26,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 7
-#define FW_VERSION_PATCH 1
+#define FW_VERSION_MINOR 8
+#define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -71,6 +71,11 @@ struct Colors {
   static constexpr uint16_t SUB = rgb565(180, 180, 180);
   static constexpr uint16_t GREY = 0xBDF7;
   static constexpr uint16_t WHITE = 0xFFFF;
+  // Rollenansichten
+  static constexpr uint16_t ROLE_START = rgb565(170, 30, 30);
+  static constexpr uint16_t ROLE_READY = rgb565(20, 60, 180);
+  static constexpr uint16_t ROLE_RUNNING = rgb565(0, 130, 0);
+  static constexpr uint16_t ROLE_STOPPED = rgb565(70, 70, 85);
 };
 
 struct Layout {
@@ -84,6 +89,17 @@ struct Layout {
   static constexpr int BAT_Y = WIFI_BARS_Y - 2;
   static constexpr int ASSIGN_PCT_BASELINE_Y = 105;
   static constexpr int ASSIGN_LETTER_BASELINE_Y = 175;
+  // Rollenansichten (Start / Bahn)
+  static constexpr int ROLE_HEADER_Y = 34;
+  static constexpr int ROLE_TIME_BASELINE_Y = 100;
+  static constexpr int ROLE_TIME_BAND_TOP = 60;
+  static constexpr int ROLE_TIME_BAND_H = 54;
+  static constexpr int ROLE_NAME_Y = 136;
+  static constexpr int ROLE_DISCIPLINE_Y = 156;
+  static constexpr int ROLE_SEPARATOR_Y = 166;
+  static constexpr int ROLE_LAST_LABEL_Y = 186;
+  static constexpr int ROLE_LAST_TIME_Y = 212;
+  static constexpr int ROLE_LAST_META_Y = 232;
 };
 
 struct Timing {
@@ -95,6 +111,8 @@ struct Timing {
   static constexpr uint32_t VBAT_POLL_MS = 5000;
   static constexpr uint32_t VBAT_SETTLE_MS = 5;
   static constexpr uint8_t VBAT_SAMPLE_COUNT = 8;
+  // Laufende Uhr in den Rollenansichten: nur das Zeitfeld wird so oft neu uebertragen
+  static constexpr uint32_t ROLE_CLOCK_MS = 60;
 };
 
 // Schnittstelle zum Pi (nur internes WLAN/LAN, siehe README "Taster <-> Pi Schnittstelle")
@@ -111,6 +129,9 @@ struct Net {
   static constexpr const char* DEVICE_NAME = "";
   static constexpr uint32_t REGISTER_RETRY_MS = 5000;
   static constexpr uint32_t REREGISTER_MS = 60000;
+  // Abfrage der Anzeigedaten (GET /api/display): mit Rolle schnell, ohne Rolle langsam
+  static constexpr uint32_t DISPLAY_POLL_MS = 400;
+  static constexpr uint32_t DISPLAY_POLL_IDLE_MS = 1000;
   // Leer: kein X-Api-Key-Header
   static constexpr const char* API_KEY = SECRET_API_KEY;
   static constexpr uint32_t HTTP_TIMEOUT_MS = 1500;

@@ -18,4 +18,26 @@ int wifiRssi();
 // Vom Server vergebener Buchstabe (A-J); '?' bis zur Anmeldung
 char letter();
 
+// Anzeigedaten der Rolle (Starter/Bahn), vom Server per GET /api/display geholt.
+struct RoleInfo {
+  enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2 };
+  enum State : uint8_t { READY = 0, RUNNING = 1, STOPPED = 2, INACTIVE = 3 };
+  uint8_t role = NONE;
+  uint8_t state = READY;
+  uint8_t lane = 0;
+  uint16_t run = 0;
+  int32_t elapsedMs = 0;  // Laufzeit zum Empfangszeitpunkt (nur RUNNING)
+  int32_t timeMs = -1;    // gestoppte Zeit, -1 = keine
+  uint32_t recvMs = 0;    // millis() beim Empfang
+  int32_t lastMs = -1;    // letzte abgeschlossene Zeit, -1 = keine
+  uint16_t lastRun = 0;
+  uint32_t seq = 0;       // zaehlt hoch, wenn sich der Inhalt (ausser der Uhr) aendert
+  char name[32] = "";
+  char discipline[32] = "";
+  char lastName[32] = "";
+};
+
+// Kopie der letzten Anzeigedaten; false, solange noch keine Antwort kam.
+bool roleInfo(RoleInfo& out);
+
 }  // namespace netlink

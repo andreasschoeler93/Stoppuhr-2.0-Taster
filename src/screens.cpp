@@ -26,6 +26,67 @@ void printCentered(const char* text, int baselineY) {
   c.print(text);
 }
 
+uint16_t roleBg(const netlink::RoleInfo& ri) {
+  if (ri.role == netlink::RoleInfo::STARTER) return cfg::Colors::ROLE_START;
+  switch (ri.state) {
+    case netlink::RoleInfo::RUNNING: return cfg::Colors::ROLE_RUNNING;
+    case netlink::RoleInfo::STOPPED:
+    case netlink::RoleInfo::INACTIVE: return cfg::Colors::ROLE_STOPPED;
+    default: return cfg::Colors::ROLE_READY;
+  }
+}
+
+void formatTime(char* out, size_t size, int32_t ms) {
+  if (ms < 0) {
+    snprintf(out, size, "--:--,--");
+    return;
+  }
+  int32_t cs = ms / 10;
+  snprintf(out, size, "%02ld:%02ld,%02ld", (long)(cs / 6000), (long)((cs / 100) % 60), (long)(cs % 100));
+}
+
+// Aktuell anzuzeigende Zeit; -1 = unbekannt
+int32_t shownTime(const netlink::RoleInfo& ri) {
+  if (ri.state == netlink::RoleInfo::RUNNING) return ri.elapsedMs + (int32_t)(millis() - ri.recvMs);
+  if (ri.state == netlink::RoleInfo::STOPPED) return ri.timeMs;
+  return -1;
+}
+
+// Kuerzt Text mit "..." so, dass er in die Bildschirmbreite passt.
+void printFitted(const char* text, int baselineY) {
+  GFXcanvas16& c = display::canvas();
+  char buf[40];
+  strncpy(buf, text, sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = '\0';
+  const int maxW = cfg::Screen::W - 2 * cfg::Screen::SAFE;
+  for (;;) {
+    int16_t xb, yb;
+    uint16_t w, h;
+    c.getTextBounds(buf, 0, 0, &xb, &yb, &w, &h);
+    size_t n = strlen(buf);
+    if ((int)w <= maxW || n <= 4) break;
+    buf[n - 4] = '.';
+    buf[n - 3] = '.';
+    buf[n - 2] = '.';
+    buf[n - 1] = '\0';
+  }
+  printCentered(buf, baselineY);
+}
+
+void drawTime(const netlink::RoleInfo& ri, uint16_t bg) {
+  GFXcanvas16& c = display::canvas();
+  c.fillRect(0, cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Screen::W, cfg::Layout::ROLE_TIME_BAND_H, bg);
+  char t[16];
+  formatTime(t, sizeof(t), shownTime(ri));
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans24pt7b);
+  int16_t xb, yb;
+  uint16_t w, h;
+  c.getTextBounds(t, 0, 0, &xb, &yb, &w, &h);
+  if ((int)w > cfg::Screen::W - 2 * cfg::Screen::SAFE) c.setFont(&FreeSans12pt7b);
+  printCentered(t, cfg::Layout::ROLE_TIME_BASELINE_Y);
+}
+
 }  // namespace
 
 void drawSplash(char letter, const measure::Data& m) {
@@ -81,6 +142,66 @@ uint16_t drawAssign(char letter, const measure::Data& m) {
 
   display::renderBottomBar(bg, letter, m);
   return bg;
+}
+
+void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) {
+  if (!display::ready()) return;
+
+  GFXcanvas16& c = display::canvas();
+  const uint16_t bg = roleBg(ri);
+  c.fillScreen(bg);
+  c.setTextColor(cfg::Colors::WHITE);
+
+  // Kopfzeile: Rolle links, Lauf rechts
+  char head[12];
+  if (ri.role == netlink::RoleInfo::STARTER) snprintf(head, sizeof(head), "Start");
+  else snprintf(head, sizeof(head), "Bahn %u", ri.lane);
+  c.setFont(&FreeSans12pt7b);
+  c.setCursor(cfg::Screen::SAFE, cfg::Layout::ROLE_HEADER_Y);
+  c.print(head);
+  char run[12];
+  snprintf(run, sizeof(run), "Lauf %u", ri.run);
+  int16_t xb, yb;
+  uint16_t w, h;
+  c.getTextBounds(run, 0, 0, &xb, &yb, &w, &h);
+  c.setCursor(cfg::Screen::W - cfg::Screen::SAFE - (int)w, cfg::Layout::ROLE_HEADER_Y);
+  c.print(run);
+
+  drawTime(ri, bg);
+
+  c.setFont(&FreeSans12pt7b);
+  printFitted(ri.name, cfg::Layout::ROLE_NAME_Y);
+  c.setFont(&FreeSans9pt7b);
+  c.setTextColor(cfg::Colors::SUB);
+  printFitted(ri.discipline, cfg::Layout::ROLE_DISCIPLINE_Y);
+
+  c.drawFastHLine(cfg::Screen::SAFE, cfg::Layout::ROLE_SEPARATOR_Y, cfg::Screen::W - 2 * cfg::Screen::SAFE,
+                  cfg::Colors::SUB);
+
+  const bool starter = ri.role == netlink::RoleInfo::STARTER;
+  c.setFont(&FreeSans9pt7b);
+  printCentered(starter ? "Letzter Lauf" : "Letzte Zeit", cfg::Layout::ROLE_LAST_LABEL_Y);
+  char last[16];
+  formatTime(last, sizeof(last), ri.lastMs);
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans12pt7b);
+  printCentered(last, cfg::Layout::ROLE_LAST_TIME_Y);
+  if (ri.lastMs >= 0) {
+    char meta[40];
+    if (starter || !ri.lastName[0]) snprintf(meta, sizeof(meta), "Lauf %u", ri.lastRun);
+    else snprintf(meta, sizeof(meta), "%s", ri.lastName);
+    c.setFont(&FreeSans9pt7b);
+    c.setTextColor(cfg::Colors::SUB);
+    printFitted(meta, cfg::Layout::ROLE_LAST_META_Y);
+  }
+
+  display::renderBottomBar(bg, letter, m);
+}
+
+void drawRoleClock(const netlink::RoleInfo& ri) {
+  if (!display::ready()) return;
+  drawTime(ri, roleBg(ri));
+  display::flushRows(cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Layout::ROLE_TIME_BAND_H);
 }
 
 }  // namespace screens

@@ -27,6 +27,9 @@ portMUX_TYPE qMux = portMUX_INITIALIZER_UNLOCKED;
 String deviceMac;
 String deviceName;
 volatile char tasterLetter = '?';
+RoleInfo roleState;
+bool roleValid = false;
+portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
 bool peek(Event& e) {
   bool ok = false;
   portENTER_CRITICAL(&qMux);
@@ -148,6 +151,83 @@ bool registerTaster() {
   return code == 200;
 }
 
+// Minimaler Zugriff auf flaches JSON ("key":wert); der Server sendet nur ASCII ohne Escapes.
+const char* jsonValue(const String& s, const char* key) {
+  String pat = String("\"") + key + "\":";
+  int p = s.indexOf(pat);
+  if (p < 0) return nullptr;
+  p += pat.length();
+  while (p < (int)s.length() && s[p] == ' ') p++;
+  return s.c_str() + p;
+}
+
+int32_t jsonInt(const String& s, const char* key, int32_t fallback) {
+  const char* v = jsonValue(s, key);
+  if (!v || *v == 'n' || *v == '"') return fallback;  // null oder Text
+  return (int32_t)atol(v);
+}
+
+void jsonStr(const String& s, const char* key, char* out, size_t size) {
+  out[0] = '\0';
+  const char* v = jsonValue(s, key);
+  if (!v || *v != '"') return;
+  size_t i = 0;
+  for (++v; *v && *v != '"' && i < size - 1; ++v) out[i++] = (*v >= 32 && *v < 127) ? *v : '?';
+  out[i] = '\0';
+}
+
+// Holt Rolle und Anzeigedaten (GET /api/display?mac=...). Gibt die aktuelle Rolle zurueck.
+uint8_t pollDisplay() {
+  if (WiFi.status() != WL_CONNECTED) return RoleInfo::NONE;
+  HTTPClient http;
+  http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  if (!http.begin(String(cfg::Net::PI_BASE_URL) + "/api/display?mac=" + deviceMac)) return roleState.role;
+  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  int code = http.GET();
+  String body = code == 200 ? http.getString() : String();
+  http.end();
+  if (code != 200) return roleState.role;
+
+  RoleInfo r;
+  char roleText[12];
+  jsonStr(body, "role", roleText, sizeof(roleText));
+  r.role = !strcmp(roleText, "starter") ? RoleInfo::STARTER
+         : !strcmp(roleText, "lane")    ? RoleInfo::LANE
+                                        : RoleInfo::NONE;
+  char stateText[12];
+  jsonStr(body, "state", stateText, sizeof(stateText));
+  r.state = !strcmp(stateText, "running")  ? RoleInfo::RUNNING
+          : !strcmp(stateText, "stopped")  ? RoleInfo::STOPPED
+          : !strcmp(stateText, "inactive") ? RoleInfo::INACTIVE
+                                           : RoleInfo::READY;
+  r.lane = (uint8_t)jsonInt(body, "lane", 0);
+  r.run = (uint16_t)jsonInt(body, "run", 0);
+  r.elapsedMs = jsonInt(body, "elapsed_ms", 0);
+  r.timeMs = jsonInt(body, "time_ms", -1);
+  r.lastMs = jsonInt(body, "last_ms", -1);
+  r.lastRun = (uint16_t)jsonInt(body, "last_run", 0);
+  jsonStr(body, "name", r.name, sizeof(r.name));
+  jsonStr(body, "discipline", r.discipline, sizeof(r.discipline));
+  jsonStr(body, "last_name", r.lastName, sizeof(r.lastName));
+  r.recvMs = millis();
+
+  portENTER_CRITICAL(&roleMux);
+  bool same = roleValid && r.role == roleState.role && r.state == roleState.state &&
+              r.lane == roleState.lane && r.run == roleState.run && r.timeMs == roleState.timeMs &&
+              r.lastMs == roleState.lastMs && r.lastRun == roleState.lastRun &&
+              !strcmp(r.name, roleState.name) && !strcmp(r.discipline, roleState.discipline) &&
+              !strcmp(r.lastName, roleState.lastName);
+  r.seq = roleState.seq + (same ? 0 : 1);
+  roleState = r;
+  roleValid = true;
+  portEXIT_CRITICAL(&roleMux);
+#if DBG
+  if (!same) Serial.printf("[NET] rolle=%s state=%s bahn=%u lauf=%u\n", roleText, stateText, r.lane, r.run);
+#endif
+  return r.role;
+}
+
 // Eine Zustellung mit Retry/Backoff. true: Event erledigt (entfernen).
 bool deliver(const Event& e) {
   int64_t ts = epochMsFor(e.pressMs);
@@ -182,6 +262,8 @@ void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
   uint32_t lastVitalsMs = 0;
   uint32_t lastRegisterMs = 0;
+  uint32_t lastPollMs = 0;
+  uint8_t role = RoleInfo::NONE;
   bool registered = false;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
@@ -205,6 +287,11 @@ void netTask(void*) {
       if (millis() - lastRegisterMs >= (registered ? cfg::Net::REREGISTER_MS : cfg::Net::REGISTER_RETRY_MS)) {
         lastRegisterMs = millis();
         registered = registerTaster();
+      }
+      if (millis() - lastPollMs >= (role != RoleInfo::NONE ? cfg::Net::DISPLAY_POLL_MS
+                                                           : cfg::Net::DISPLAY_POLL_IDLE_MS)) {
+        lastPollMs = millis();
+        role = pollDisplay();
       }
       if (millis() - lastVitalsMs >= cfg::Net::VITALS_INTERVAL_MS) {
         lastVitalsMs = millis();
@@ -279,6 +366,14 @@ size_t queued() { return qCount; }
 int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
 
 char letter() { return tasterLetter; }
+
+bool roleInfo(RoleInfo& out) {
+  portENTER_CRITICAL(&roleMux);
+  out = roleState;
+  bool ok = roleValid;
+  portEXIT_CRITICAL(&roleMux);
+  return ok;
+}
 
 uint8_t wifiLevel() {
   if (WiFi.status() != WL_CONNECTED) return 0;

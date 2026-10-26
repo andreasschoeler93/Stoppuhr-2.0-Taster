@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.7.1`.
+Aktuell: `v0.8.0`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -101,6 +101,17 @@ unteren Leiste; bis zur Anmeldung steht dort `?`. Danach sendet er alle 10 s
 `ts` fehlt, der Server setzt die Empfangszeit. `clock_ms` ist die Uhrzeit des Tasters
 (Epoch in ms, nur wenn per NTP synchron). Daraus bestimmt der Server den Versatz
 zur eigenen Uhr und gleicht die Zeitstempel der Tastendrücke damit aus.
+
+### Rollenansichten (Start / Bahn)
+
+Der Taster fragt per `GET /api/display?mac=<mac>` (alle 400 ms mit Rolle, sonst 1 s) Rolle und Anzeigedaten ab.
+Ohne Rolle bleibt die Zuordnungsansicht. Mit Rolle zeigt das Display:
+
+- **Start** (rot): „Lauf N", Zeit, „N Schwimmer", Disziplin, letzter Lauf.
+- **Bahn N**: blau = bereit, grün = läuft, grau = gestoppt oder ohne Startkarte; Name, Disziplin, letzte Zeit.
+
+Die laufende Uhr rechnet lokal weiter (`elapsed_ms` + Zeit seit Empfang) und überträgt nur das Zeitfeld
+(`display::flushRows`, alle `Timing::ROLE_CLOCK_MS`). Umlaute liefert der Server als ASCII (ae, oe, ue, ss).
 
 ### Verhalten
 

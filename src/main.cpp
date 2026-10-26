@@ -17,9 +17,11 @@
 
 namespace {
 
-enum class UiMode : uint8_t { SPLASH, ASSIGN };
+enum class UiMode : uint8_t { SPLASH, ASSIGN, ROLE };
 
 UiMode uiMode = UiMode::SPLASH;
+uint32_t roleSeq = 0;
+uint32_t lastClockMs = 0;
 uint32_t modeStartedMs = 0;
 char assignLetter = '?';
 uint16_t assignBg = cfg::Colors::PREP_BG;
@@ -73,14 +75,38 @@ void loop() {
     assignLetter = netlink::letter();
     changed |= measure::CHANGED_BATTERY;
   }
+  netlink::RoleInfo ri;
+  const bool haveRole = netlink::roleInfo(ri) && ri.role != netlink::RoleInfo::NONE;
+
   if (uiMode == UiMode::SPLASH) {
     if (millis() - modeStartedMs >= cfg::Timing::SPLASH_MS) {
-      uiMode = UiMode::ASSIGN;
-      assignBg = screens::drawAssign(assignLetter, m);
+      if (haveRole) {
+        uiMode = UiMode::ROLE;
+        roleSeq = ri.seq;
+        screens::drawRole(ri, assignLetter, m);
+      } else {
+        uiMode = UiMode::ASSIGN;
+        assignBg = screens::drawAssign(assignLetter, m);
+      }
     } else if (changed) {
       display::renderBottomBar(cfg::Colors::SPLASH, assignLetter, m);
     }
-  } else if (changed & measure::CHANGED_BATTERY) {
+  } else if (haveRole) {
+    // Rollenansicht: Vollbild bei Aenderung, sonst nur das Zeitfeld
+    if (uiMode != UiMode::ROLE || ri.seq != roleSeq || (changed & measure::CHANGED_BATTERY)) {
+      uiMode = UiMode::ROLE;
+      roleSeq = ri.seq;
+      screens::drawRole(ri, assignLetter, m);
+      lastClockMs = millis();
+    } else if (changed & measure::CHANGED_BAR) {
+      screens::drawRole(ri, assignLetter, m);
+    } else if (ri.state == netlink::RoleInfo::RUNNING &&
+               millis() - lastClockMs >= cfg::Timing::ROLE_CLOCK_MS) {
+      lastClockMs = millis();
+      screens::drawRoleClock(ri);
+    }
+  } else if (uiMode == UiMode::ROLE || (changed & measure::CHANGED_BATTERY)) {
+    uiMode = UiMode::ASSIGN;
     assignBg = screens::drawAssign(assignLetter, m);
   } else if (changed & measure::CHANGED_BAR) {
     display::renderBottomBar(assignBg, assignLetter, m);
