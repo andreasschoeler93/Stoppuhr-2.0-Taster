@@ -78,7 +78,7 @@ void drawTime(const netlink::RoleInfo& ri, uint16_t bg) {
   c.fillRect(0, cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Screen::W, cfg::Layout::ROLE_TIME_BAND_H, bg);
   char t[16];
   formatTime(t, sizeof(t), shownTime(ri));
-  c.setTextColor(cfg::Colors::WHITE);
+  c.setTextColor(ri.state == netlink::RoleInfo::STOPPED ? cfg::Colors::TIME_STOPPED : cfg::Colors::WHITE);
   c.setFont(&FreeSans24pt7b);
   int16_t xb, yb;
   uint16_t w, h;
@@ -117,7 +117,9 @@ void drawLaneList(const netlink::RoleInfo& ri, uint16_t bg) {
     c.setTextColor(cfg::Colors::WHITE);
     c.setCursor(cfg::Screen::SAFE, base);
     c.print(num);
-    c.setTextColor(ms < 0 ? cfg::Colors::SUB : cfg::Colors::WHITE);
+    c.setTextColor(ms < 0 ? cfg::Colors::SUB
+                          : l.state == netlink::RoleInfo::STOPPED ? cfg::Colors::TIME_STOPPED
+                                                                  : cfg::Colors::WHITE);
     int16_t xb, yb;
     uint16_t w, hh;
     c.getTextBounds(t, 0, 0, &xb, &yb, &w, &hh);

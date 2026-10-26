@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.8.3`.
+Aktuell: `v0.8.4`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -125,7 +125,7 @@ Der Taster fragt per `GET /api/display?mac=<mac>` (alle 400 ms mit Rolle, sonst 
 Ohne Rolle bleibt die Zuordnungsansicht. Mit Rolle zeigt das Display:
 
 - **Start** (rot): Kopfzeile „Start" / „Lauf N", darunter alle Bahnen des Laufs untereinander (links Ziffer, rechts Zeit; `--:--,--` solange die Bahn wartet, sonst laufende bzw. gestoppte Zeit). Der Server liefert sie als Feld `lanes` (`"bahn,zustand,ms;..."`).
-- **Bahn N**: blau = bereit, grün = läuft, grau = gestoppt oder ohne Startkarte; Name, Disziplin, letzte Zeit.
+- **Bahn N**: blau = bereit, grün = läuft, grau = gestoppt oder ohne Startkarte; Name, Disziplin, letzte Zeit. Eine gestoppte Zeit steht in Gelb (`TIME_STOPPED`), auch in der Bahnliste des Starters.
 
 Die laufende Uhr rechnet lokal weiter (`elapsed_ms` + Zeit seit Empfang) und überträgt nur das Zeitfeld
 (`display::flushRows`, alle `Timing::ROLE_CLOCK_MS`). Umlaute liefert der Server als ASCII (ae, oe, ue, ss).
