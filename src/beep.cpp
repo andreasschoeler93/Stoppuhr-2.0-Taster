@@ -8,8 +8,20 @@ namespace {
 constexpr uint8_t RES = 10;
 constexpr uint16_t FREQ_CLICK = 4200;
 constexpr uint16_t DUR_CLICK_MS = 55;
+// Dumpfer Ton fuer Signale vom Server (Lauf gestartet / Bahn gestoppt)
+constexpr uint16_t FREQ_DULL = 1200;
+constexpr uint16_t DUR_DULL_MS = 110;
 bool ok = false;
 uint32_t offAt = 0;
+
+void play(uint16_t freq, uint16_t durMs) {
+  if (!ok) return;
+  ledcDetach(cfg::Pins::PIEZO);
+  ok = ledcAttach(cfg::Pins::PIEZO, freq, RES);
+  if (!ok) return;
+  ledcWrite(cfg::Pins::PIEZO, (uint16_t)((1U << RES) * 0.50f));
+  offAt = millis() + durMs;
+}
 
 }  // namespace
 
@@ -23,14 +35,9 @@ void begin() {
 #endif
 }
 
-void click() {
-  if (!ok) return;
-  ledcDetach(cfg::Pins::PIEZO);
-  ok = ledcAttach(cfg::Pins::PIEZO, FREQ_CLICK, RES);
-  if (!ok) return;
-  ledcWrite(cfg::Pins::PIEZO, (uint16_t)((1U << RES) * 0.50f));
-  offAt = millis() + DUR_CLICK_MS;
-}
+void click() { play(FREQ_CLICK, DUR_CLICK_MS); }
+
+void dull() { play(FREQ_DULL, DUR_DULL_MS); }
 
 void tick() {
   if (ok && offAt && (int32_t)(millis() - offAt) >= 0) {

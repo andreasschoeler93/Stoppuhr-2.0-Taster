@@ -79,6 +79,31 @@ void loop() {
   netlink::RoleInfo ri;
   const bool haveRole = netlink::roleInfo(ri) && ri.role != netlink::RoleInfo::NONE;
 
+  // Dumpfer Ton: Bahn-Taster bei Laufstart, Starter bei jeder gestoppten Bahn.
+  // Der erste Datensatz nach dem Einschalten loest nichts aus.
+  static bool sigInit = false;
+  static uint8_t sigState = 0;
+  static uint16_t sigRun = 0;
+  static uint8_t sigStopped = 0;
+  if (haveRole) {
+    uint8_t stopped = 0;
+    for (uint8_t i = 0; i < ri.laneCount; i++) {
+      if (ri.lanes[i].state == netlink::RoleInfo::STOPPED) stopped++;
+    }
+    if (sigInit) {
+      if (ri.role == netlink::RoleInfo::LANE && ri.state == netlink::RoleInfo::RUNNING &&
+          sigState != netlink::RoleInfo::RUNNING) {
+        beep::dull();
+      } else if (ri.role == netlink::RoleInfo::STARTER && ri.run == sigRun && stopped > sigStopped) {
+        beep::dull();
+      }
+    }
+    sigInit = true;
+    sigState = ri.state;
+    sigRun = ri.run;
+    sigStopped = stopped;
+  }
+
   if (uiMode == UiMode::SPLASH) {
     if (millis() - modeStartedMs >= cfg::Timing::SPLASH_MS) {
       if (haveRole) {

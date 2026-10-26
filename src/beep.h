@@ -5,6 +5,8 @@ namespace beep {
 
 void begin();
 void click();
+// Dumpfer, tieferer Ton (Signal vom Server)
+void dull();
 // Regelmaessig in loop() aufrufen, beendet laufende Toene.
 void tick();
 

@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.8.2`.
+Aktuell: `v0.8.3`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -102,6 +102,13 @@ unteren Leiste; bis zur Anmeldung steht dort `?`. Danach sendet er alle 10 s
 (Epoch in ms, nur wenn per NTP synchron). Daraus bestimmt der Server den Versatz
 zur eigenen Uhr. Er gleicht die Zeitstempel nur bei grober Abweichung (> 250 ms) aus;
 kleinere Versätze sind Netzlatenz und würden die Zeiten verfälschen.
+
+### Signaltöne
+
+- Heller Klick (4200 Hz): eigener Tastendruck.
+- Dumpfer Ton (1200 Hz, 110 ms): Bahn-Taster beim Start des Laufs, Starter bei jeder Bahn, die
+  stoppt. Ausgelöst durch die Anzeigedaten des Servers (Verzögerung bis ca. 400 ms Abfrageintervall).
+  Der erste Datensatz nach dem Einschalten piept nicht.
 
 ### Zeitgenauigkeit
 
