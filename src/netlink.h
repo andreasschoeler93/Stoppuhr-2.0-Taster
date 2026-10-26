@@ -15,5 +15,7 @@ size_t queued();
 uint8_t wifiLevel();
 // Signalstaerke in dBm (0, wenn nicht verbunden)
 int wifiRssi();
+// Vom Server vergebener Buchstabe (A-J); '?' bis zur Anmeldung
+char letter();
 
 }  // namespace netlink

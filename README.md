@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.6.2`.
+Aktuell: `v0.7.0`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -92,7 +92,10 @@ Fehler: `{"ok":false,"error":"...","code":"..."}`.
 Nach dem Verbinden meldet sich der Taster mit `POST /api/taster`
 (`{"mac":"...","name":"T-DDEE01"}`) an und wiederholt das alle 5 s, bis der Pi
 mit 200 antwortet, und danach alle 60 s erneut (der Server vergisst Taster z. B. nach einem Reset; die Anmeldung ist wiederholbar). Der Name entsteht aus den letzten drei MAC-Bytes
-(`cfg::Net::DEVICE_NAME` überschreibt ihn). Danach sendet er alle 10 s
+(`cfg::Net::DEVICE_NAME` überschreibt ihn). Die Antwort enthält den vom Server
+vergebenen Buchstaben (`"letter"`, A–J in der Reihenfolge der Anmeldung, bleibt
+dauerhaft gespeichert). Der Taster zeigt ihn in der Zuordnungsansicht und in der
+unteren Leiste; bis zur Anmeldung steht dort `?`. Danach sendet er alle 10 s
 `POST /api/vitals` mit den Feldern des Stoppuhr-Backends:
 `{"mac","battery"(%),"temp","humidity","vbat"(V),"rssi","fw","uptime_s"}`;
 `ts` fehlt, der Server setzt die Empfangszeit.

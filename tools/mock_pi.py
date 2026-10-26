@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 seen = set()
 tasters = {}
+tasters_letter = {}
 count = 0
 started = time.time()
 args = None
@@ -42,9 +43,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(400, {"ok": False, "error": "missing mac or name"})
                 return
             neu = mac not in tasters
+            if neu:
+                tasters_letter[mac] = "ABCDEFGHIJ"[len(tasters_letter) % 10]
             tasters[mac] = name
             print(f"[{datetime.now():%H:%M:%S}] Anmeldung {name} ({mac}) {'neu' if neu else 'bekannt'}")
-            self._reply(200, {"ok": True, "taster": {"mac": mac, "name": name}})
+            self._reply(200, {"ok": True, "taster": {"mac": mac, "name": name, "letter": tasters_letter[mac]}})
             return
         if self.path == "/api/vitals":
             raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))

@@ -21,7 +21,7 @@ enum class UiMode : uint8_t { SPLASH, ASSIGN };
 
 UiMode uiMode = UiMode::SPLASH;
 uint32_t modeStartedMs = 0;
-char assignLetter = 'A';
+char assignLetter = '?';
 uint16_t assignBg = cfg::Colors::PREP_BG;
 
 }  // namespace
@@ -68,6 +68,11 @@ void loop() {
   }
   const measure::Data& m = measure::data();
 
+  // Buchstabe vom Server uebernehmen und bei Aenderung neu zeichnen
+  if (netlink::letter() != assignLetter) {
+    assignLetter = netlink::letter();
+    changed |= measure::CHANGED_BATTERY;
+  }
   if (uiMode == UiMode::SPLASH) {
     if (millis() - modeStartedMs >= cfg::Timing::SPLASH_MS) {
       uiMode = UiMode::ASSIGN;

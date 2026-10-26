@@ -26,7 +26,7 @@ bool haveTrigger = false;
 portMUX_TYPE qMux = portMUX_INITIALIZER_UNLOCKED;
 String deviceMac;
 String deviceName;
-
+volatile char tasterLetter = '?';
 bool peek(Event& e) {
   bool ok = false;
   portENTER_CRITICAL(&qMux);
@@ -129,9 +129,17 @@ bool registerTaster() {
   http.addHeader("Content-Type", "application/json");
   if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
   int code = http.POST(body);
+  // Antwort: {"ok":true,"taster":{...,"letter":"A",...}}; der Server vergibt den Buchstaben
+  if (code == 200) {
+    String resp = http.getString();
+    int p = resp.indexOf("\"letter\":\"");
+    if (p >= 0 && p + 10 < (int)resp.length() && resp[p + 10] >= 'A' && resp[p + 10] <= 'Z') {
+      tasterLetter = resp[p + 10];
+    }
+  }
   http.end();
 #if DBG
-  Serial.printf("[NET] register name=%s http=%d\n", deviceName.c_str(), code);
+  Serial.printf("[NET] register name=%s letter=%c http=%d\n", deviceName.c_str(), tasterLetter, code);
 #endif
   return code == 200;
 }
@@ -265,6 +273,8 @@ bool sendTrigger() {
 size_t queued() { return qCount; }
 
 int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
+
+char letter() { return tasterLetter; }
 
 uint8_t wifiLevel() {
   if (WiFi.status() != WL_CONNECTED) return 0;
