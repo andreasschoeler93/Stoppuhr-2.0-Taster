@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.7.0`.
+Aktuell: `v0.7.1`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -97,8 +97,10 @@ vergebenen Buchstaben (`"letter"`, A–J in der Reihenfolge der Anmeldung, bleib
 dauerhaft gespeichert). Der Taster zeigt ihn in der Zuordnungsansicht und in der
 unteren Leiste; bis zur Anmeldung steht dort `?`. Danach sendet er alle 10 s
 `POST /api/vitals` mit den Feldern des Stoppuhr-Backends:
-`{"mac","battery"(%),"temp","humidity","vbat"(V),"rssi","fw","uptime_s"}`;
-`ts` fehlt, der Server setzt die Empfangszeit.
+`{"mac","battery"(%),"temp","humidity","vbat"(V),"rssi","fw","uptime_s","clock_ms"}`;
+`ts` fehlt, der Server setzt die Empfangszeit. `clock_ms` ist die Uhrzeit des Tasters
+(Epoch in ms, nur wenn per NTP synchron). Daraus bestimmt der Server den Versatz
+zur eigenen Uhr und gleicht die Zeitstempel der Tastendrücke damit aus.
 
 ### Verhalten
 

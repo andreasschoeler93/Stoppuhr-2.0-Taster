@@ -97,11 +97,15 @@ void postVitals() {
   }
   // Feldnamen wie im Stoppuhr-Backend (battery = Prozent, temp, humidity);
   // ts fehlt absichtlich, der Server setzt dann die Empfangszeit.
+  // clock_ms (Uhr des Tasters, nur wenn synchron) dient dem Server, den Uhrversatz auszugleichen.
+  char clock[40] = "";
+  int64_t nowEpoch = epochMsFor(millis());
+  if (nowEpoch != 0) snprintf(clock, sizeof(clock), ",\"clock_ms\":%llu", (unsigned long long)nowEpoch);
   snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
-           "\"vbat\":%.3f,\"rssi\":%d,\"fw\":\"%s\",\"uptime_s\":%lu}",
+           "\"vbat\":%.3f,\"rssi\":%d,\"fw\":\"%s\",\"uptime_s\":%lu%s}",
            deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
-           WiFi.RSSI(), FW_VERSION, (unsigned long)(millis() / 1000));
+           WiFi.RSSI(), FW_VERSION, (unsigned long)(millis() / 1000), clock);
 
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
