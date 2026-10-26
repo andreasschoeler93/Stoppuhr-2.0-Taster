@@ -26,8 +26,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 5
-#define FW_VERSION_PATCH 0
+#define FW_VERSION_MINOR 6
+#define FW_VERSION_PATCH 2
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -103,10 +103,14 @@ struct Net {
   static constexpr const char* WIFI_SSID = SECRET_WIFI_SSID;
   static constexpr const char* WIFI_PASS = SECRET_WIFI_PASS;
   // Statische Pi-IP (kein DNS noetig); auch als NTP-Quelle fuer den Zeitstempel
-  static constexpr const char* PI_BASE_URL = "http://" SECRET_PI_IP ":8000";
+  static constexpr const char* PI_BASE_URL = "http://" SECRET_PI_IP ":1999";
   static constexpr const char* NTP_SERVER = SECRET_NTP_SERVER;
   // Leer: MAC des ESP32 wird verwendet
   static constexpr const char* DEVICE_MAC = "";
+  // Anzeigename im Server; leer = "T-" + letzte 3 MAC-Bytes
+  static constexpr const char* DEVICE_NAME = "";
+  static constexpr uint32_t REGISTER_RETRY_MS = 5000;
+  static constexpr uint32_t REREGISTER_MS = 60000;
   // Leer: kein X-Api-Key-Header
   static constexpr const char* API_KEY = SECRET_API_KEY;
   static constexpr uint32_t HTTP_TIMEOUT_MS = 1500;

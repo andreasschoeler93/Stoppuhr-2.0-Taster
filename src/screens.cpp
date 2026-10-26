@@ -17,7 +17,7 @@ uint16_t bgFromPercent(uint8_t percent) {
   return cfg::rgb565(180, 0, 0);
 }
 
-void printCentered(const String& text, int baselineY) {
+void printCentered(const char* text, int baselineY) {
   GFXcanvas16& c = display::canvas();
   int16_t xb, yb;
   uint16_t w, h;
@@ -29,6 +29,8 @@ void printCentered(const String& text, int baselineY) {
 }  // namespace
 
 void drawSplash(char letter, const measure::Data& m) {
+  if (!display::ready()) return;
+
   GFXcanvas16& c = display::canvas();
   c.fillScreen(cfg::Colors::SPLASH);
 
@@ -44,6 +46,8 @@ void drawSplash(char letter, const measure::Data& m) {
 }
 
 uint16_t drawAssign(char letter, const measure::Data& m) {
+  if (!display::ready()) return cfg::Colors::PREP_BG;
+
   GFXcanvas16& c = display::canvas();
   bool batteryKnown = isfinite(m.vbat);
   uint16_t bg = batteryKnown ? bgFromPercent(m.vbatPercent) : cfg::Colors::PREP_BG;
@@ -51,11 +55,14 @@ uint16_t drawAssign(char letter, const measure::Data& m) {
 
   c.setTextColor(cfg::Colors::WHITE);
   c.setFont(&FreeSans12pt7b);
-  printCentered(batteryKnown ? String(m.vbatPercent) + "%" : String("--%"),
-                cfg::Layout::ASSIGN_PCT_BASELINE_Y);
+  char percent[8];
+  if (batteryKnown) snprintf(percent, sizeof(percent), "%u%%", m.vbatPercent);
+  else snprintf(percent, sizeof(percent), "--%%");
+  printCentered(percent, cfg::Layout::ASSIGN_PCT_BASELINE_Y);
 
   c.setFont(&FreeSans24pt7b);
-  printCentered(String(letter), cfg::Layout::ASSIGN_LETTER_BASELINE_Y);
+  const char letterText[] = {letter, '\0'};
+  printCentered(letterText, cfg::Layout::ASSIGN_LETTER_BASELINE_Y);
 
   c.setFont(&FreeSans9pt7b);
   c.setTextColor(cfg::Colors::GREY);
@@ -63,7 +70,7 @@ uint16_t drawAssign(char letter, const measure::Data& m) {
 
 #if VBAT_SCREEN_DEBUG
   char dbg[40];
-  snprintf(dbg, sizeof(dbg), "Akku %.2f V", m.vbatCalc);
+  snprintf(dbg, sizeof(dbg), "Akku %.3f V", m.vbatCalc);
   printCentered(dbg, 192);
   snprintf(dbg, sizeof(dbg), "raw %lu  adc %.3fV", (unsigned long)m.rawAverage, m.adcVoltage);
   printCentered(dbg, 208);

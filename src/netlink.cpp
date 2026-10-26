@@ -2,6 +2,7 @@
 
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <esp_mac.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -24,6 +25,7 @@ uint32_t lastTriggerMs = 0;
 bool haveTrigger = false;
 portMUX_TYPE qMux = portMUX_INITIALIZER_UNLOCKED;
 String deviceMac;
+String deviceName;
 
 bool peek(Event& e) {
   bool ok = false;
@@ -93,11 +95,13 @@ void postVitals() {
     strcpy(t, "null");
     strcpy(h, "null");
   }
+  // Feldnamen wie im Stoppuhr-Backend (battery = Prozent, temp, humidity);
+  // ts fehlt absichtlich, der Server setzt dann die Empfangszeit.
   snprintf(body, sizeof(body),
-           "{\"mac\":\"%s\",\"fw\":\"%s\",\"temp_c\":%s,\"humidity\":%s,"
-           "\"vbat\":%.2f,\"battery_pct\":%u,\"rssi\":%d,\"uptime_s\":%lu}",
-           deviceMac.c_str(), FW_VERSION, t, h, m.vbatCalc, (unsigned)m.vbatPercent,
-           WiFi.RSSI(), (unsigned long)(millis() / 1000));
+           "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
+           "\"vbat\":%.3f,\"rssi\":%d,\"fw\":\"%s\",\"uptime_s\":%lu}",
+           deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
+           WiFi.RSSI(), FW_VERSION, (unsigned long)(millis() / 1000));
 
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
@@ -110,6 +114,26 @@ void postVitals() {
 #if DBG
   Serial.printf("[NET] vitals http=%d\n", code);
 #endif
+}
+
+// Meldet den Taster beim Server an (POST /api/taster). true: angemeldet.
+bool registerTaster() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+  char body[96];
+  snprintf(body, sizeof(body), "{\"mac\":\"%s\",\"name\":\"%s\"}",
+           deviceMac.c_str(), deviceName.c_str());
+  HTTPClient http;
+  http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  if (!http.begin(String(cfg::Net::PI_BASE_URL) + "/api/taster")) return false;
+  http.addHeader("Content-Type", "application/json");
+  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  int code = http.POST(body);
+  http.end();
+#if DBG
+  Serial.printf("[NET] register name=%s http=%d\n", deviceName.c_str(), code);
+#endif
+  return code == 200;
 }
 
 // Eine Zustellung mit Retry/Backoff. true: Event erledigt (entfernen).
@@ -145,6 +169,8 @@ bool deliver(const Event& e) {
 void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
   uint32_t lastVitalsMs = 0;
+  uint32_t lastRegisterMs = 0;
+  bool registered = false;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
       lastWifiTryMs = millis();
@@ -163,6 +189,11 @@ void netTask(void*) {
         vTaskDelay(pdMS_TO_TICKS(cfg::Net::FLUSH_RETRY_MS));
       }
     } else {
+      // Anmeldung regelmaessig wiederholen: der Server vergisst Taster z. B. nach einem Reset
+      if (millis() - lastRegisterMs >= (registered ? cfg::Net::REREGISTER_MS : cfg::Net::REGISTER_RETRY_MS)) {
+        lastRegisterMs = millis();
+        registered = registerTaster();
+      }
       if (millis() - lastVitalsMs >= cfg::Net::VITALS_INTERVAL_MS) {
         lastVitalsMs = millis();
         postVitals();
@@ -180,7 +211,27 @@ void begin() {
   // Verstecktes WLAN: alle Kanaele absuchen, bester Empfang zuerst
   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-  deviceMac = cfg::Net::DEVICE_MAC[0] ? String(cfg::Net::DEVICE_MAC) : WiFi.macAddress();
+  if (cfg::Net::DEVICE_MAC[0]) {
+    deviceMac = cfg::Net::DEVICE_MAC;
+  } else {
+    // Direkt aus dem eFuse lesen; WiFi.macAddress() liefert vor dem WLAN-Start 00:..:00
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char buf[18];
+    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    deviceMac = buf;
+  }
+  // Eindeutiger Name aus den letzten drei MAC-Bytes, z. B. "T-DD:EE:01" -> "T-DDEE01"
+  deviceName = cfg::Net::DEVICE_NAME[0] ? String(cfg::Net::DEVICE_NAME) : String("T-");
+  if (!cfg::Net::DEVICE_NAME[0]) {
+    for (size_t i = deviceMac.length() - 8; i < deviceMac.length(); ++i) {
+      if (deviceMac[i] != ':') deviceName += deviceMac[i];
+    }
+  }
+#if DBG
+  Serial.printf("[NET] mac=%s name=%s\n", deviceMac.c_str(), deviceName.c_str());
+#endif
   WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
   configTime(0, 0, cfg::Net::NTP_SERVER);
   xTaskCreate(netTask, "netlink", 8192, nullptr, 1, nullptr);

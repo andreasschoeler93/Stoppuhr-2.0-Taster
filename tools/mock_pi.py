@@ -4,7 +4,7 @@ Start (Python von PlatformIO, nichts weiter zu installieren):
   & 'C:\\Users\\andre\\.platformio\\penv\\Scripts\\python.exe' tools\\mock_pi.py
 
 Optionen:
-  --port 8000       Port (muss zu PI_BASE_URL passen)
+  --port 1999       Port (muss zu PI_BASE_URL passen)
   --fail-every N    jede N-te Anfrage mit 503 beantworten (Retry-Test)
   --offline-s S     die ersten S Sekunden nicht antworten (Queue-Test)
 """
@@ -15,6 +15,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 seen = set()
+tasters = {}
 count = 0
 started = time.time()
 args = None
@@ -31,17 +32,33 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global count
+        if self.path == "/api/taster":
+            raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            try:
+                d = json.loads(raw)
+                mac, name = d["mac"], d["name"]
+            except (ValueError, KeyError, TypeError):
+                print(f"Anmeldung ungueltig: {raw[:80]!r}")
+                self._reply(400, {"ok": False, "error": "missing mac or name"})
+                return
+            neu = mac not in tasters
+            tasters[mac] = name
+            print(f"[{datetime.now():%H:%M:%S}] Anmeldung {name} ({mac}) {'neu' if neu else 'bekannt'}")
+            self._reply(200, {"ok": True, "taster": {"mac": mac, "name": name}})
+            return
         if self.path == "/api/vitals":
             raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
             try:
                 d = json.loads(raw)
                 print(
                     f"[{datetime.now():%H:%M:%S}] Vitaldaten {d['mac']}: "
-                    f"{d['temp_c']} C, {d['humidity']} %, Akku {d['vbat']} V "
-                    f"({d['battery_pct']} %), WLAN {d['rssi']} dBm, fw {d['fw']}"
+                    f"{d['temp']} C, {d['humidity']} %, Akku {d['battery']} % "
+                    f"({d['vbat']:.3f} V), WLAN {d['rssi']} dBm, fw {d['fw']}"
                 )
             except (ValueError, KeyError, TypeError):
                 print(f"Vitaldaten ungueltig: {raw[:80]!r}")
+                self._reply(400, {"ok": False, "error": "invalid vitals"})
+                return
             self._reply(200, {"ok": True})
             return
         if self.path != "/api/triggers":
@@ -89,7 +106,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     global args
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=1999)
     parser.add_argument("--fail-every", type=int, default=0)
     parser.add_argument("--offline-s", type=int, default=0)
     args = parser.parse_args()

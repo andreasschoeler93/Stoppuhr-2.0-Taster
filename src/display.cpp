@@ -13,6 +13,7 @@ namespace {
 SPIClass spi;
 Adafruit_ST7789 tft(&spi, cfg::Pins::CS, cfg::Pins::DC, cfg::Pins::RST);
 GFXcanvas16 gfx(cfg::Screen::W, cfg::Screen::H);
+bool displayReady = false;
 
 int bottomBarY() {
   return cfg::Screen::H - cfg::Screen::SAFE - cfg::Screen::BOTTOM_H - 2;
@@ -50,14 +51,12 @@ void drawWifiBars(int16_t x, int16_t y, uint8_t level) {
   }
 }
 
-String bottomText(char letter, const measure::Data& m) {
-  char text[64];
+void bottomText(char* text, size_t size, char letter, const measure::Data& m) {
   if (!m.ahtOk || !isfinite(m.temperature) || !isfinite(m.humidity)) {
-    snprintf(text, sizeof(text), "--.-C --%% %c", letter);
+    snprintf(text, size, "--.-C --%% %c", letter);
   } else {
-    snprintf(text, sizeof(text), "%.1fC %.0f%% %c", m.temperature, m.humidity, letter);
+    snprintf(text, size, "%.1fC %.0f%% %c", m.temperature, m.humidity, letter);
   }
-  return String(text);
 }
 
 }  // namespace
@@ -65,12 +64,21 @@ String bottomText(char letter, const measure::Data& m) {
 void begin() {
   spi.begin(cfg::Pins::SCLK, -1, cfg::Pins::MOSI, cfg::Pins::CS);
   delay(50);
+  if (!gfx.getBuffer()) {
+    Serial.println("[GFX] ERROR: canvas allocation failed");
+    return;
+  }
   tft.init(cfg::Screen::W, cfg::Screen::H);
   tft.setRotation(0);
   gfx.setTextWrap(false);
+  displayReady = true;
 #if DBG
-  Serial.printf("[GFX] canvas buffer=%s\n", gfx.getBuffer() ? "OK" : "FAIL");
+  Serial.println("[GFX] canvas buffer=OK");
 #endif
+}
+
+bool ready() {
+  return displayReady;
 }
 
 GFXcanvas16& canvas() {
@@ -78,11 +86,13 @@ GFXcanvas16& canvas() {
 }
 
 void flush() {
-  if (!gfx.getBuffer()) return;
+  if (!displayReady) return;
   tft.drawRGBBitmap(0, 0, gfx.getBuffer(), cfg::Screen::W, cfg::Screen::H);
 }
 
 void renderBottomBar(uint16_t accent, char letter, const measure::Data& m) {
+  if (!displayReady) return;
+
   int rectTop = bottomBarY() - 4;
   int rectH = cfg::Screen::BOTTOM_H + 12;
 
@@ -96,7 +106,8 @@ void renderBottomBar(uint16_t accent, char letter, const measure::Data& m) {
                   m.vbatLevel, cfg::Colors::GREY, accent);
   drawWifiBars(cfg::Layout::WIFI_LEFT_X, cfg::Layout::WIFI_BARS_Y, netlink::wifiLevel());
 
-  String text = bottomText(letter, m);
+  char text[64];
+  bottomText(text, sizeof(text), letter, m);
   gfx.setFont(&FreeSans9pt7b);
   gfx.setTextColor(cfg::Colors::GREY);
 

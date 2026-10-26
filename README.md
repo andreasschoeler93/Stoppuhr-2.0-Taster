@@ -26,7 +26,11 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.5.0`.
+Aktuell: `v0.6.2`.
+
+Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
+werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
+Zeichenoperationen sicher.
 
 ## Projektstruktur
 
@@ -72,7 +76,7 @@ Fehler: `{"ok":false,"error":"...","code":"..."}`.
 | Variable | Default | Bedeutung |
 |---|---|---|
 | `WIFI_SSID`, `WIFI_PASS` | aus `src/secrets.h` | verstecktes, passwortgeschütztes WLAN des Pi |
-| `PI_BASE_URL` | `http://<SECRET_PI_IP>:8000` | statische Pi-IP (kein DNS nötig) |
+| `PI_BASE_URL` | `http://<SECRET_PI_IP>:1999` | statische Pi-IP (kein DNS nötig) |
 | `NTP_SERVER` | `SECRET_PI_IP` | Zeitquelle für `ts` (Epoch-ms); Pi braucht einen NTP-Dienst (z. B. chrony) |
 | `DEVICE_MAC` | leer = ESP32-MAC | Geräte-ID |
 | `API_KEY` | aus `src/secrets.h`, leer = kein Header | optional, als `X-Api-Key` |
@@ -82,6 +86,16 @@ Fehler: `{"ok":false,"error":"...","code":"..."}`.
 | `ENABLE_OFFLINE_QUEUE` | true | Events puffern, wenn Senden scheitert |
 | `QUEUE_MAX` | 32 | Queue-Größe (nur RAM); bei Überlauf wird das **älteste** Event verworfen |
 | `TRIGGER_MIN_INTERVAL_MS` | 300 | Entprellung zusätzlich zur Hardware-Entprellung (40 ms) |
+
+### Anmeldung und Vitaldaten
+
+Nach dem Verbinden meldet sich der Taster mit `POST /api/taster`
+(`{"mac":"...","name":"T-DDEE01"}`) an und wiederholt das alle 5 s, bis der Pi
+mit 200 antwortet, und danach alle 60 s erneut (der Server vergisst Taster z. B. nach einem Reset; die Anmeldung ist wiederholbar). Der Name entsteht aus den letzten drei MAC-Bytes
+(`cfg::Net::DEVICE_NAME` überschreibt ihn). Danach sendet er alle 10 s
+`POST /api/vitals` mit den Feldern des Stoppuhr-Backends:
+`{"mac","battery"(%),"temp","humidity","vbat"(V),"rssi","fw","uptime_s"}`;
+`ts` fehlt, der Server setzt die Empfangszeit.
 
 ### Verhalten
 
@@ -96,7 +110,7 @@ Fehler: `{"ok":false,"error":"...","code":"..."}`.
 
 ### Inbetriebnahme im internen WLAN
 
-1. Pi mit fester IP bzw. DHCP-Reservierung im selben Netz betreiben, Stoppuhr-Server auf Port 8000.
+1. Pi mit fester IP bzw. DHCP-Reservierung im selben Netz betreiben, Stoppuhr-Server auf Port 1999.
 2. `src/secrets.example.h` nach `src/secrets.h` kopieren und SSID, Passwort, Pi-IP
    (ggf. API-Key) eintragen. Die Datei wird nicht ins Repository hochgeladen.
    Ohne sie baut die Firmware mit Platzhaltern (z. B. auf GitHub), verbindet sich aber nicht.

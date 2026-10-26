@@ -9,6 +9,7 @@
 namespace display {
 
 void begin();
+bool ready();
 GFXcanvas16& canvas();
 void flush();
 
