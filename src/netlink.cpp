@@ -210,6 +210,25 @@ uint8_t pollDisplay() {
   jsonStr(body, "name", r.name, sizeof(r.name));
   jsonStr(body, "discipline", r.discipline, sizeof(r.discipline));
   jsonStr(body, "last_name", r.lastName, sizeof(r.lastName));
+  if (r.role == RoleInfo::STARTER) {
+    const char* v = jsonValue(body, "lanes");
+    if (v && *v == '"') {
+      ++v;
+      while (*v && *v != '"' && r.laneCount < RoleInfo::MAX_LANES) {
+        RoleInfo::Lane& l = r.lanes[r.laneCount];
+        l.number = (uint8_t)atoi(v);
+        const char* c = strchr(v, ',');
+        if (!c || !c[1]) break;
+        l.state = c[1] == 's' ? RoleInfo::STOPPED : c[1] == 'r' ? RoleInfo::RUNNING : RoleInfo::READY;
+        c = strchr(c + 1, ',');
+        l.ms = c ? (int32_t)atol(c + 1) : -1;
+        r.laneCount++;
+        v = strchr(v, ';');
+        if (!v) break;
+        ++v;
+      }
+    }
+  }
   r.recvMs = millis();
 
   portENTER_CRITICAL(&roleMux);
@@ -217,7 +236,8 @@ uint8_t pollDisplay() {
               r.lane == roleState.lane && r.run == roleState.run && r.timeMs == roleState.timeMs &&
               r.lastMs == roleState.lastMs && r.lastRun == roleState.lastRun &&
               !strcmp(r.name, roleState.name) && !strcmp(r.discipline, roleState.discipline) &&
-              !strcmp(r.lastName, roleState.lastName);
+              !strcmp(r.lastName, roleState.lastName) && r.laneCount == roleState.laneCount &&
+              !memcmp(r.lanes, roleState.lanes, sizeof(r.lanes));
   r.seq = roleState.seq + (same ? 0 : 1);
   roleState = r;
   roleValid = true;

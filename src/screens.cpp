@@ -87,6 +87,45 @@ void drawTime(const netlink::RoleInfo& ri, uint16_t bg) {
   printCentered(t, cfg::Layout::ROLE_TIME_BASELINE_Y);
 }
 
+// Starter: alle Bahnen untereinander, links Ziffer, rechts Zeit.
+void drawLaneList(const netlink::RoleInfo& ri, uint16_t bg) {
+  GFXcanvas16& c = display::canvas();
+  const int top = cfg::Layout::STARTER_LIST_TOP;
+  const int h = cfg::Layout::STARTER_LIST_BOTTOM - top;
+  c.fillRect(0, top, cfg::Screen::W, h, bg);
+  if (ri.laneCount == 0) {
+    c.setFont(&FreeSans9pt7b);
+    c.setTextColor(cfg::Colors::SUB);
+    printCentered("keine Bahnen", top + h / 2);
+    return;
+  }
+  const int rowH = min(34, h / ri.laneCount);
+  const bool big = rowH >= 24;
+  c.setFont(big ? &FreeSans12pt7b : &FreeSans9pt7b);
+  const int shift = big ? 7 : 5;
+  const int32_t running = ri.state == netlink::RoleInfo::RUNNING ? shownTime(ri) : -1;
+  for (uint8_t i = 0; i < ri.laneCount; i++) {
+    const netlink::RoleInfo::Lane& l = ri.lanes[i];
+    const int base = top + i * rowH + rowH / 2 + shift;
+    int32_t ms = l.state == netlink::RoleInfo::STOPPED ? l.ms
+               : l.state == netlink::RoleInfo::RUNNING ? running
+                                                        : -1;
+    char num[4];
+    snprintf(num, sizeof(num), "%u", l.number);
+    char t[16];
+    formatTime(t, sizeof(t), ms);
+    c.setTextColor(cfg::Colors::WHITE);
+    c.setCursor(cfg::Screen::SAFE, base);
+    c.print(num);
+    c.setTextColor(ms < 0 ? cfg::Colors::SUB : cfg::Colors::WHITE);
+    int16_t xb, yb;
+    uint16_t w, hh;
+    c.getTextBounds(t, 0, 0, &xb, &yb, &w, &hh);
+    c.setCursor(cfg::Screen::W - cfg::Screen::SAFE - (int)w, base);
+    c.print(t);
+  }
+}
+
 }  // namespace
 
 void drawSplash(char letter, const measure::Data& m) {
@@ -167,6 +206,12 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
   c.setCursor(cfg::Screen::W - cfg::Screen::SAFE - (int)w, cfg::Layout::ROLE_HEADER_Y);
   c.print(run);
 
+  if (ri.role == netlink::RoleInfo::STARTER) {
+    drawLaneList(ri, bg);
+    display::renderBottomBar(bg, letter, m);
+    return;
+  }
+
   drawTime(ri, bg);
 
   c.setFont(&FreeSans12pt7b);
@@ -200,6 +245,12 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
 
 void drawRoleClock(const netlink::RoleInfo& ri) {
   if (!display::ready()) return;
+  if (ri.role == netlink::RoleInfo::STARTER) {
+    drawLaneList(ri, roleBg(ri));
+    display::flushRows(cfg::Layout::STARTER_LIST_TOP,
+                       cfg::Layout::STARTER_LIST_BOTTOM - cfg::Layout::STARTER_LIST_TOP);
+    return;
+  }
   drawTime(ri, roleBg(ri));
   display::flushRows(cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Layout::ROLE_TIME_BAND_H);
 }

@@ -27,7 +27,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 8
-#define FW_VERSION_PATCH 0
+#define FW_VERSION_PATCH 1
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -100,6 +100,9 @@ struct Layout {
   static constexpr int ROLE_LAST_LABEL_Y = 186;
   static constexpr int ROLE_LAST_TIME_Y = 212;
   static constexpr int ROLE_LAST_META_Y = 232;
+  // Starter: Bahnliste (nur Ziffer und Zeit je Zeile)
+  static constexpr int STARTER_LIST_TOP = 44;
+  static constexpr int STARTER_LIST_BOTTOM = 238;
 };
 
 struct Timing {

@@ -35,6 +35,15 @@ struct RoleInfo {
   char name[32] = "";
   char discipline[32] = "";
   char lastName[32] = "";
+  // Nur Starter: Bahnen des Laufs
+  struct Lane {
+    uint8_t number;
+    uint8_t state;  // READY = wartet, RUNNING = laeuft, STOPPED = gestoppt
+    int32_t ms;     // nur bei STOPPED
+  };
+  static constexpr uint8_t MAX_LANES = 10;
+  uint8_t laneCount = 0;
+  Lane lanes[MAX_LANES] = {};
 };
 
 // Kopie der letzten Anzeigedaten; false, solange noch keine Antwort kam.
