@@ -32,6 +32,27 @@ volatile char tasterLetter = '?';
 RoleInfo roleState;
 bool roleValid = false;
 portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
+// Pi-Adresse einmal aufloesen und merken: ein Namensabruf pro Anfrage kostete teils Sekunden.
+volatile uint32_t piIp = 0;
+volatile bool pollNow = false;
+
+String baseUrl() {
+  uint32_t ip = piIp;
+  if (ip == 0) {
+    IPAddress a;
+    if (WiFi.status() == WL_CONNECTED && WiFi.hostByName(cfg::Net::PI_HOST, a) == 1 && (uint32_t)a != 0) {
+      piIp = ip = (uint32_t)a;
+    }
+  }
+  String host = ip ? IPAddress(ip).toString() : String(cfg::Net::PI_HOST);
+  return String("http://") + host + ":" + String(cfg::Net::PI_PORT);
+}
+
+// Bei Verbindungsfehler die Adresse beim naechsten Mal neu aufloesen.
+void forgetIp(int code) {
+  if (code <= 0) piIp = 0;
+}
+
 bool peek(Event& e) {
   bool ok = false;
   portENTER_CRITICAL(&qMux);
@@ -73,7 +94,7 @@ int64_t epochMsFor(int64_t pressUs) {
 
 // Rueckgabe: HTTP-Status oder <=0 bei Netzwerkfehler/Timeout.
 int postTrigger(const Event& e, int64_t ts) {
-  String url = String(cfg::Net::PI_BASE_URL) + "/api/triggers";
+  String url = baseUrl() + "/api/triggers";
   String body = String("{\"mac\":\"") + deviceMac + "\",\"ts\":" + String((unsigned long long)ts) +
                 ",\"stopwatch_ms\":null,\"run_id\":null}";
   HTTPClient http;
@@ -86,6 +107,7 @@ int postTrigger(const Event& e, int64_t ts) {
   if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
   int code = http.POST(body);
   http.end();
+  forgetIp(code);
   return code;
 }
 
@@ -117,7 +139,7 @@ void postVitals() {
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
-  if (!http.begin(String(cfg::Net::PI_BASE_URL) + "/api/vitals")) return;
+  if (!http.begin(baseUrl() + "/api/vitals")) return;
   http.addHeader("Content-Type", "application/json");
   if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
   int code = http.POST(body);
@@ -136,7 +158,7 @@ bool registerTaster() {
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
-  if (!http.begin(String(cfg::Net::PI_BASE_URL) + "/api/taster")) return false;
+  if (!http.begin(baseUrl() + "/api/taster")) return false;
   http.addHeader("Content-Type", "application/json");
   if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
   int code = http.POST(body);
@@ -186,11 +208,12 @@ uint8_t pollDisplay() {
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
-  if (!http.begin(String(cfg::Net::PI_BASE_URL) + "/api/display?mac=" + deviceMac)) return roleState.role;
+  if (!http.begin(baseUrl() + "/api/display?mac=" + deviceMac)) return roleState.role;
   if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
   int code = http.GET();
   String body = code == 200 ? http.getString() : String();
   http.end();
+  forgetIp(code);
   if (code != 200) return roleState.role;
 
   RoleInfo r;
@@ -286,8 +309,6 @@ void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
   uint32_t lastVitalsMs = 0;
   uint32_t lastRegisterMs = 0;
-  uint32_t lastPollMs = 0;
-  uint8_t role = RoleInfo::NONE;
   bool registered = false;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
@@ -300,6 +321,7 @@ void netTask(void*) {
       // Reihenfolge bleibt erhalten: nur der Kopf wird gesendet.
       if (deliver(e)) {
         popIfHead(e.id);
+          pollNow = true;
       } else if (!cfg::Net::ENABLE_OFFLINE_QUEUE) {
         logLine(e.id, 0, 0, "dropped");
         popIfHead(e.id);
@@ -312,11 +334,6 @@ void netTask(void*) {
         lastRegisterMs = millis();
         registered = registerTaster();
       }
-      if (millis() - lastPollMs >= (role != RoleInfo::NONE ? cfg::Net::DISPLAY_POLL_MS
-                                                           : cfg::Net::DISPLAY_POLL_IDLE_MS)) {
-        lastPollMs = millis();
-        role = pollDisplay();
-      }
       if (millis() - lastVitalsMs >= cfg::Net::VITALS_INTERVAL_MS) {
         lastVitalsMs = millis();
         postVitals();
@@ -326,10 +343,27 @@ void netTask(void*) {
   }
 }
 
+// Eigener Task nur fuer die Anzeige: wird nicht von Senden, Anmeldung oder Vitaldaten aufgehalten.
+void displayTask(void*) {
+  uint32_t lastPollMs = 0;
+  uint8_t role = RoleInfo::NONE;
+  for (;;) {
+    uint32_t interval = role != RoleInfo::NONE ? cfg::Net::DISPLAY_POLL_MS : cfg::Net::DISPLAY_POLL_IDLE_MS;
+    if (pollNow || millis() - lastPollMs >= interval) {
+      pollNow = false;
+      lastPollMs = millis();
+      role = pollDisplay();
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 }  // namespace
 
 void begin() {
   WiFi.mode(WIFI_STA);
+  // Ohne WLAN-Energiesparen antwortet der Chip sofort statt erst im naechsten Beacon-Intervall
+  WiFi.setSleep(false);
   WiFi.setAutoReconnect(true);
   // Verstecktes WLAN: alle Kanaele absuchen, bester Empfang zuerst
   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
@@ -360,6 +394,7 @@ void begin() {
   sntp_set_sync_interval(cfg::Net::NTP_SYNC_INTERVAL_MS);
   configTime(0, 0, cfg::Net::NTP_SERVER);
   xTaskCreate(netTask, "netlink", 8192, nullptr, 1, nullptr);
+  xTaskCreate(displayTask, "display", 8192, nullptr, 1, nullptr);
 }
 
 bool sendTrigger(int64_t pressUs) {

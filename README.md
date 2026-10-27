@@ -76,7 +76,7 @@ Fehler: `{"ok":false,"error":"...","code":"..."}`.
 | Variable | Default | Bedeutung |
 |---|---|---|
 | `WIFI_SSID`, `WIFI_PASS` | aus `src/secrets.h` | verstecktes, passwortgeschütztes WLAN des Pi |
-| `PI_BASE_URL` | `http://<SECRET_PI_IP>:1999` | statische Pi-IP (kein DNS nötig) |
+| `PI_HOST` / `PI_PORT` | `<SECRET_PI_IP>` / 1999 | Pi-IP oder Name; ein Name wird nur einmal aufgelöst und die IP gemerkt |
 | `NTP_SERVER` | `SECRET_PI_IP` | Zeitquelle für `ts` (Epoch-ms); Pi braucht einen NTP-Dienst (z. B. chrony) |
 | `DEVICE_MAC` | leer = ESP32-MAC | Geräte-ID |
 | `API_KEY` | aus `src/secrets.h`, leer = kein Header | optional, als `X-Api-Key` |
@@ -107,7 +107,7 @@ kleinere Versätze sind Netzlatenz und würden die Zeiten verfälschen.
 
 - Heller Klick (4200 Hz): eigener Tastendruck.
 - Dumpfer Ton (1200 Hz, 110 ms): Bahn-Taster beim Start des Laufs, Starter bei jeder Bahn, die
-  stoppt. Ausgelöst durch die Anzeigedaten des Servers (Verzögerung bis ca. 400 ms Abfrageintervall).
+  stoppt. Ausgelöst durch die Anzeigedaten des Servers (Verzögerung bis ca. 200 ms Abfrageintervall; die Abfrage läuft in eigenem Task und startet sofort nach dem eigenen Druck).
   Der erste Datensatz nach dem Einschalten piept nicht.
 
 ### Zeitgenauigkeit
@@ -121,7 +121,7 @@ kleinere Versätze sind Netzlatenz und würden die Zeiten verfälschen.
 
 ### Rollenansichten (Start / Bahn)
 
-Der Taster fragt per `GET /api/display?mac=<mac>` (alle 400 ms mit Rolle, sonst 1 s) Rolle und Anzeigedaten ab.
+Der Taster fragt per `GET /api/display?mac=<mac>` (alle 200 ms mit Rolle, sonst 1 s) Rolle und Anzeigedaten ab.
 Ohne Rolle bleibt die Zuordnungsansicht. Mit Rolle zeigt das Display:
 
 - **Start** (rot): Kopfzeile „Start" / „Lauf N", darunter alle Bahnen des Laufs untereinander (links Ziffer, rechts Zeit; `--:--,--` solange die Bahn wartet, sonst laufende bzw. gestoppte Zeit). Der Server liefert sie als Feld `lanes` (`"bahn,zustand,ms;..."`).
