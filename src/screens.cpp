@@ -179,6 +179,27 @@ void drawSplash(char letter, const measure::Data& m) {
   display::renderBottomBar(cfg::Colors::SPLASH, letter, m);
 }
 
+void drawUpdate(uint8_t percent) {
+  if (!display::ready()) return;
+  GFXcanvas16& c = display::canvas();
+  c.fillScreen(cfg::Colors::SPLASH);
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans12pt7b);
+  printCentered("Update", 110);
+  char t[8];
+  snprintf(t, sizeof(t), "%u%%", percent);
+  c.setFont(&FreeSans24pt7b);
+  printCentered(t, 165);
+  const int x = cfg::Screen::SAFE + 4;
+  const int w = cfg::Screen::W - 2 * x;
+  c.drawRect(x, 190, w, 12, cfg::Colors::WHITE);
+  c.fillRect(x + 2, 192, (w - 4) * percent / 100, 8, cfg::Colors::TIME_STOPPED);
+  c.setFont(&FreeSans9pt7b);
+  c.setTextColor(cfg::Colors::GREY);
+  printCentered("nicht ausschalten", 230);
+  display::flush();
+}
+
 uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
   if (!display::ready()) return cfg::Colors::PREP_BG;
 

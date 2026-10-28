@@ -26,7 +26,20 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.10.6`.
+Aktuell: `v0.11.0`.
+
+## Update über den Pi (OTA)
+
+Ab `v0.11.0` lädt der Taster neue Firmware selbst vom Pi (Weboberfläche → Einstellungen → Firmware).
+Beim Taggen (`git tag vX.Y.Z`, `git push --tags`) baut GitHub Actions ([release.yml](.github/workflows/release.yml))
+die Firmware und hängt `firmware.bin` an ein Release. Der Pi listet diese Releases, lädt die gewählte Datei
+und bietet sie den Tastern an, die gerade online sind.
+
+- Der Taster prüft Größe und MD5, schreibt in den zweiten App-Slot und startet neu. Auf dem Display steht „Update“ mit Fortschritt.
+- Er aktualisiert nie während eines laufenden Laufs und nur mit leerer Sendewarteschlange.
+- Zugangsdaten (WLAN, Pi-IP, API-Key) stehen nicht im Release-Build. Sie werden beim ersten USB-Flash aus `secrets.h`
+  im Flash (NVS) gespeichert und von dort gelesen. Der **erste Flash mit `v0.11.0` muss deshalb per USB und mit `secrets.h`** erfolgen.
+- Versionen vor `v0.11.0` können nicht per Update installiert werden (sie kennen den Flash-Speicher für Zugangsdaten nicht).
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt

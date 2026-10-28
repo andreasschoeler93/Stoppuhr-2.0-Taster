@@ -68,6 +68,23 @@ void loop() {
   }
 
   beep::tick();
+  // Firmware-Update: nur Fortschritt zeigen, danach neu zeichnen
+  static bool updateShown = false;
+  uint8_t otaPct = 0;
+  if (netlink::otaActive(otaPct)) {
+    static uint32_t lastOtaDrawMs = 0;
+    if (!updateShown || millis() - lastOtaDrawMs >= 250) {
+      lastOtaDrawMs = millis();
+      updateShown = true;
+      screens::drawUpdate(otaPct);
+    }
+    return;
+  }
+  if (updateShown) {
+    updateShown = false;
+    uiMode = UiMode::SPLASH;
+    modeStartedMs = millis() - cfg::Timing::SPLASH_MS;
+  }
   int64_t pressUs = 0;
   if (button::pressed(&pressUs)) {
     pendingPressUs = pressUs;

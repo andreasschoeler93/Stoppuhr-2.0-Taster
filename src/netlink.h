@@ -21,6 +21,8 @@ int wifiRssi();
 // Vom Server vergebener Buchstabe (A-J); '?' bis zur Anmeldung
 char letter();
 bool shutdownRequested();
+// true, solange ein Firmware-Update vom Pi laeuft; percent = Fortschritt 0..100
+bool otaActive(uint8_t& percent);
 
 // Anzeigedaten der Rolle (Starter/Bahn), vom Server per GET /api/display geholt.
 struct RoleInfo {

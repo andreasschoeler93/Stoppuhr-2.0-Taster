@@ -7,6 +7,8 @@
 namespace screens {
 
 void drawSplash(char letter, const measure::Data& m);
+// Fortschrittsanzeige waehrend eines Firmware-Updates (0..100)
+void drawUpdate(uint8_t percent);
 // Gibt die Hintergrundfarbe zurueck (fuer spaetere Updates der unteren Leiste).
 uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane = 0);
 

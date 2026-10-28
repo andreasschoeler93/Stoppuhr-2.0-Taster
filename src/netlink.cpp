@@ -1,6 +1,8 @@
 #include "netlink.h"
 
 #include <HTTPClient.h>
+#include <Preferences.h>
+#include <Update.h>
 #include <WiFi.h>
 #include <esp_mac.h>
 #include <esp_sntp.h>
@@ -39,15 +41,71 @@ volatile uint32_t piIp = 0;
 volatile bool pollNow = false;
 volatile bool reregisterNow = false;
 
+// Firmware-Update vom Pi (OTA)
+struct OtaOffer {
+  bool valid = false;
+  char version[16] = "";
+  char md5[40] = "";
+  uint32_t size = 0;
+} otaOffer;
+portMUX_TYPE otaMux = portMUX_INITIALIZER_UNLOCKED;
+volatile bool otaBusy = false;
+volatile uint8_t otaPercent = 0;
+char otaFailedVersion[16] = "";  // fehlgeschlagene Version nicht endlos wiederholen
+
+// Zugangsdaten zur Laufzeit: ein per Update installierter Build hat keine eigenen Zugangsdaten.
+// Builds mit secrets.h speichern sie im Flash (NVS), alle anderen lesen sie von dort.
+struct Creds {
+  char ssid[33];
+  char pass[65];
+  char ssid2[33];
+  char pass2[65];
+  char host[40];
+  char key[48];
+  char ntp[40];
+} creds;
+
+void loadCreds() {
+  Preferences p;
+  p.begin("cred", false);
+  struct Item {
+    const char* name;
+    char* out;
+    size_t size;
+    const char* compiled;
+  } items[] = {
+      {"ssid", creds.ssid, sizeof(creds.ssid), cfg::Net::WIFI_SSID},
+      {"pass", creds.pass, sizeof(creds.pass), cfg::Net::WIFI_PASS},
+      {"ssid2", creds.ssid2, sizeof(creds.ssid2), cfg::Net::WIFI2_SSID},
+      {"pass2", creds.pass2, sizeof(creds.pass2), cfg::Net::WIFI2_PASS},
+      {"host", creds.host, sizeof(creds.host), cfg::Net::PI_HOST},
+      {"key", creds.key, sizeof(creds.key), cfg::Net::API_KEY},
+      {"ntp", creds.ntp, sizeof(creds.ntp), cfg::Net::NTP_SERVER},
+  };
+  for (auto& it : items) {
+#if HAVE_SECRETS
+    p.putString(it.name, it.compiled);
+    strlcpy(it.out, it.compiled, it.size);
+#else
+    if (p.isKey(it.name)) {
+      p.getString(it.name, it.out, it.size);
+    } else {
+      strlcpy(it.out, it.compiled, it.size);
+    }
+#endif
+  }
+  p.end();
+}
+
 String baseUrl() {
   uint32_t ip = piIp;
   if (ip == 0) {
     IPAddress a;
-    if (WiFi.status() == WL_CONNECTED && WiFi.hostByName(cfg::Net::PI_HOST, a) == 1 && (uint32_t)a != 0) {
+    if (WiFi.status() == WL_CONNECTED && WiFi.hostByName(creds.host, a) == 1 && (uint32_t)a != 0) {
       piIp = ip = (uint32_t)a;
     }
   }
-  String host = ip ? IPAddress(ip).toString() : String(cfg::Net::PI_HOST);
+  String host = ip ? IPAddress(ip).toString() : String(creds.host);
   return String("http://") + host + ":" + String(cfg::Net::PI_PORT);
 }
 
@@ -107,7 +165,7 @@ int postTrigger(const Event& e, int64_t ts) {
   if (!http.begin(url)) return -1;
   http.addHeader("Accept", "application/json");
   http.addHeader("Content-Type", "application/json");
-  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.POST(body);
   http.end();
   forgetIp(code);
@@ -125,7 +183,7 @@ int postAbortRun(const Event& e) {
   if (!http.begin(url)) return -1;
   http.addHeader("Accept", "application/json");
   http.addHeader("Content-Type", "application/json");
-  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.POST(body);
   http.end();
   forgetIp(code);
@@ -162,7 +220,7 @@ void postVitals() {
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   if (!http.begin(baseUrl() + "/api/vitals")) return;
   http.addHeader("Content-Type", "application/json");
-  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.POST(body);
   http.end();
 #if DBG
@@ -181,7 +239,7 @@ bool registerTaster() {
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   if (!http.begin(baseUrl() + "/api/taster")) return false;
   http.addHeader("Content-Type", "application/json");
-  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.POST(body);
   // Antwort: {"ok":true,"taster":{...,"letter":"A",...}}; der Server vergibt den Buchstaben
   if (code == 200) {
@@ -252,7 +310,7 @@ uint8_t pollDisplay() {
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   if (!http.begin(baseUrl() + "/api/display?mac=" + deviceMac)) return roleState.role;
-  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.GET();
   String body = code == 200 ? http.getString() : String();
   http.end();
@@ -308,6 +366,22 @@ uint8_t pollDisplay() {
   }
   r.recvMs = millis();
 
+  // Firmware-Angebot des Servers (nur wenn der Server dieses Update freigegeben hat)
+  char offerVersion[16];
+  jsonStr(body, "ota_version", offerVersion, sizeof(offerVersion));
+  if (offerVersion[0] && strcmp(offerVersion, FW_VERSION) != 0) {
+    portENTER_CRITICAL(&otaMux);
+    strlcpy(otaOffer.version, offerVersion, sizeof(otaOffer.version));
+    jsonStr(body, "ota_md5", otaOffer.md5, sizeof(otaOffer.md5));
+    otaOffer.size = (uint32_t)jsonInt(body, "ota_size", 0);
+    otaOffer.valid = otaOffer.size > 0 && strlen(otaOffer.md5) == 32;
+    portEXIT_CRITICAL(&otaMux);
+  } else {
+    portENTER_CRITICAL(&otaMux);
+    otaOffer.valid = false;
+    portEXIT_CRITICAL(&otaMux);
+  }
+
   portENTER_CRITICAL(&roleMux);
   bool same = roleValid && r.role == roleState.role && r.state == roleState.state &&
               r.pendingLane == roleState.pendingLane &&
@@ -359,7 +433,7 @@ bool deliver(const Event& e) {
 }
 
 // Zweites WLAN (Bad) ist nur aktiv, wenn eine SSID dafuer konfiguriert ist.
-bool badWifiConfigured() { return cfg::Net::WIFI2_SSID[0] != '\0'; }
+bool badWifiConfigured() { return creds.ssid2[0] != '\0'; }
 
 // Taster mit Rolle oder in Bereitschaft (Tausch vorgemerkt) gehoeren ins Bad-WLAN,
 // alle anderen ins Koffer-WLAN. Das gilt auch, wenn das Bad-WLAN gerade nicht erreichbar ist.
@@ -373,8 +447,8 @@ bool wantBadWifi() {
 
 void connectProfile(bool bad) {
   WiFi.disconnect();
-  if (bad) WiFi.begin(cfg::Net::WIFI2_SSID, cfg::Net::WIFI2_PASS);
-  else WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
+  if (bad) WiFi.begin(creds.ssid2, creds.pass2);
+  else WiFi.begin(creds.ssid, creds.pass);
 }
 
 void netTask(void*) {
@@ -413,6 +487,71 @@ void netTask(void*) {
   }
 }
 
+// Meldet das Ergebnis eines Updates an den Pi (nur Fehler; Erfolg zeigt sich an der neuen Version).
+void postOtaStatus(const char* version, const char* msg) {
+  HTTPClient http;
+  http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  if (!http.begin(baseUrl() + "/api/ota-status")) return;
+  http.addHeader("Content-Type", "application/json");
+  if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
+  char body[160];
+  snprintf(body, sizeof(body), "{\"mac\":\"%s\",\"version\":\"%s\",\"ok\":false,\"msg\":\"%.60s\"}",
+           deviceMac.c_str(), version, msg);
+  http.POST(body);
+  http.end();
+}
+
+// Laedt die Firmware vom Pi, prueft MD5 und startet neu. Kehrt nur bei Fehlern zurueck.
+void performOta(const OtaOffer& offer) {
+  const char* err = nullptr;
+  otaBusy = true;
+  otaPercent = 0;
+  HTTPClient http;
+  http.setConnectTimeout(5000);
+  http.setTimeout(8000);
+  if (!http.begin(baseUrl() + "/api/firmware/download?mac=" + deviceMac)) err = "begin";
+  if (!err) {
+    if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
+    int code = http.GET();
+    int len = http.getSize();
+    if (code != 200) err = "http";
+    else if (len <= 0 || (uint32_t)len != offer.size) err = "groesse";
+    else if (!Update.begin(offer.size)) err = "speicher";
+  }
+  if (!err) {
+    Update.setMD5(offer.md5);
+    WiFiClient* stream = http.getStreamPtr();
+    uint8_t buf[1024];
+    uint32_t done = 0;
+    uint32_t lastData = millis();
+    while (done < offer.size) {
+      size_t avail = stream->available();
+      if (!avail) {
+        if (!http.connected() || millis() - lastData > 8000) { err = "abbruch"; break; }
+        vTaskDelay(pdMS_TO_TICKS(2));
+        continue;
+      }
+      size_t n = stream->readBytes(buf, min(avail, sizeof(buf)));
+      if (Update.write(buf, n) != n) { err = "schreiben"; break; }
+      done += n;
+      lastData = millis();
+      otaPercent = (uint8_t)((uint64_t)done * 100 / offer.size);
+    }
+    if (!err && !Update.end(true)) err = "pruefsumme";
+    if (err) Update.abort();
+  }
+  http.end();
+  if (!err) {
+    otaPercent = 100;
+    vTaskDelay(pdMS_TO_TICKS(500));
+    ESP.restart();
+  }
+  strlcpy(otaFailedVersion, offer.version, sizeof(otaFailedVersion));
+  otaBusy = false;
+  postOtaStatus(offer.version, err);
+}
+
 // Anmeldung und Vitaldaten in eigenem Task: ein haengender Request hier darf
 // das Senden eines Tastendrucks nicht verzoegern.
 void housekeepingTask(void*) {
@@ -420,6 +559,18 @@ void housekeepingTask(void*) {
   uint32_t lastRegisterMs = 0;
   bool registered = false;
   for (;;) {
+    OtaOffer offer;
+    portENTER_CRITICAL(&otaMux);
+    offer = otaOffer;
+    portEXIT_CRITICAL(&otaMux);
+    // Nie waehrend eines laufenden Laufs oder mit ungesendeten Tastendruecken
+    if (offer.valid && strcmp(offer.version, otaFailedVersion) != 0 && qCount == 0 &&
+        WiFi.status() == WL_CONNECTED) {
+      portENTER_CRITICAL(&roleMux);
+      const bool running = roleValid && roleState.state == RoleInfo::RUNNING;
+      portEXIT_CRITICAL(&roleMux);
+      if (!running) performOta(offer);
+    }
     if (reregisterNow) {
       reregisterNow = false;
       registered = false;
@@ -455,6 +606,7 @@ void displayTask(void*) {
 }  // namespace
 
 void begin() {
+  loadCreds();
   WiFi.mode(WIFI_STA);
   // Ohne WLAN-Energiesparen antwortet der Chip sofort statt erst im naechsten Beacon-Intervall
   WiFi.setSleep(false);
@@ -470,8 +622,8 @@ void begin() {
     Serial.printf("[WIFI] verbunden: SSID=%s IP=%s RSSI=%d Kanal=%d\n", WiFi.SSID().c_str(),
                   WiFi.localIP().toString().c_str(), WiFi.RSSI(), WiFi.channel());
   }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  Serial.printf("[WIFI] suche SSID=\"%s\" (%u Zeichen Passwort)\n", cfg::Net::WIFI_SSID,
-                (unsigned)strlen(cfg::Net::WIFI_PASS));
+  Serial.printf("[WIFI] suche SSID=\"%s\" (%u Zeichen Passwort)\n", creds.ssid,
+                (unsigned)strlen(creds.pass));
 #endif
   // Verstecktes WLAN: alle Kanaele absuchen, bester Empfang zuerst
   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
@@ -497,10 +649,10 @@ void begin() {
 #if DBG
   Serial.printf("[NET] mac=%s name=%s\n", deviceMac.c_str(), deviceName.c_str());
 #endif
-  WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
+  WiFi.begin(creds.ssid, creds.pass);
   // Haeufiger abgleichen als der Standard (1 h), damit die Quarz-Drift klein bleibt
   sntp_set_sync_interval(cfg::Net::NTP_SYNC_INTERVAL_MS);
-  configTime(0, 0, cfg::Net::NTP_SERVER);
+  configTime(0, 0, creds.ntp);
   xTaskCreate(netTask, "netlink", 8192, nullptr, 1, nullptr);
   xTaskCreate(displayTask, "display", 8192, nullptr, 1, nullptr);
   xTaskCreate(housekeepingTask, "housekeeping", 8192, nullptr, 1, nullptr);
@@ -544,6 +696,11 @@ int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
 
 char letter() { return tasterLetter; }
 bool shutdownRequested() { return shutdownRequestedFlag; }
+
+bool otaActive(uint8_t& percent) {
+  percent = otaPercent;
+  return otaBusy;
+}
 
 bool roleInfo(RoleInfo& out) {
   portENTER_CRITICAL(&roleMux);

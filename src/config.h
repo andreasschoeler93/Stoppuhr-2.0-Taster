@@ -6,6 +6,10 @@
 // src/secrets.example.h). Ohne diese Datei gelten die Platzhalter unten.
 #if __has_include("secrets.h")
 #include "secrets.h"
+// Gesetzt, wenn die Zugangsdaten aus secrets.h stammen (nicht aus einem Build ohne Zugangsdaten)
+#define HAVE_SECRETS 1
+#else
+#define HAVE_SECRETS 0
 #endif
 #ifndef SECRET_WIFI_SSID
 #define SECRET_WIFI_SSID "Stoppuhr"
@@ -32,8 +36,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 10
-#define FW_VERSION_PATCH 6
+#define FW_VERSION_MINOR 11
+#define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)

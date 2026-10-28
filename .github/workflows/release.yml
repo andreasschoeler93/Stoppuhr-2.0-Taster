@@ -1,0 +1,35 @@
+name: Release
+
+# Baut bei jedem Versions-Tag (v0.11.0 usw.) die Firmware und haengt firmware.bin
+# an ein GitHub-Release. Der Pi bietet diese Dateien zum Update der Taster an.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install platformio
+
+      - name: Firmware bauen
+        run: pio run -e seeed_xiao_esp32s3
+
+      - name: Release veroeffentlichen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            .pio/build/seeed_xiao_esp32s3/firmware.bin \
+            --title "Firmware $GITHUB_REF_NAME" \
+            --notes "Taster-Firmware $GITHUB_REF_NAME"
