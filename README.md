@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.8.4`.
+Aktuell: `v0.8.8`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -128,7 +128,11 @@ Ohne Rolle bleibt die Zuordnungsansicht. Mit Rolle zeigt das Display:
 - **Bahn N**: blau = bereit, grün = läuft, grau = gestoppt oder ohne Startkarte; Name, Disziplin, letzte Zeit. Eine gestoppte Zeit steht in Gelb (`TIME_STOPPED`), auch in der Bahnliste des Starters.
 
 Die laufende Uhr rechnet lokal weiter (`elapsed_ms` + Zeit seit Empfang) und überträgt nur das Zeitfeld
-(`display::flushRows`, alle `Timing::ROLE_CLOCK_MS`). Umlaute liefert der Server als ASCII (ae, oe, ue, ss).
+(`display::flushRows`, alle `Timing::ROLE_CLOCK_MS`). Rollenname und Disziplin unterstützen deutsche Umlaute,
+wenn das Pi-Backend sie unverändert als UTF-8 liefert. ASCII-Ersatzformen wie `ae` werden nicht automatisch
+umgewandelt, da sie auch echte Buchstabenfolgen sein können.
+Der Server kann über **Wettkampf beenden** einen befristeten Abschaltbefehl senden. Beim Empfang trennt die
+Firmware die Selbsthaltung über GPIO44 und schaltet den Taster aus.
 
 ### Verhalten
 

@@ -29,6 +29,7 @@ portMUX_TYPE qMux = portMUX_INITIALIZER_UNLOCKED;
 String deviceMac;
 String deviceName;
 volatile char tasterLetter = '?';
+volatile bool shutdownRequestedFlag = false;
 RoleInfo roleState;
 bool roleValid = false;
 portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
@@ -193,12 +194,34 @@ int32_t jsonInt(const String& s, const char* key, int32_t fallback) {
   return (int32_t)atol(v);
 }
 
+bool jsonBool(const String& s, const char* key) {
+  const char* v = jsonValue(s, key);
+  return v && strncmp(v, "true", 4) == 0;
+}
+
 void jsonStr(const String& s, const char* key, char* out, size_t size) {
   out[0] = '\0';
   const char* v = jsonValue(s, key);
   if (!v || *v != '"') return;
   size_t i = 0;
-  for (++v; *v && *v != '"' && i < size - 1; ++v) out[i++] = (*v >= 32 && *v < 127) ? *v : '?';
+  for (++v; *v && *v != '"' && i < size - 1; ++v) {
+    if (*v >= 32 && *v < 127) {
+      out[i++] = *v;
+    } else if ((uint8_t)v[0] == 0xC3 && v[1] && v[1] != '"') {
+      switch ((uint8_t)v[1]) {
+        case 0x84: out[i++] = '\x04'; break;
+        case 0x96: out[i++] = '\x05'; break;
+        case 0x9C: out[i++] = '\x06'; break;
+        case 0xA4: out[i++] = '\x01'; break;
+        case 0xB6: out[i++] = '\x02'; break;
+        case 0xBC: out[i++] = '\x03'; break;
+        default: out[i++] = '?'; break;
+      }
+      ++v;
+    } else {
+      out[i++] = '?';
+    }
+  }
   out[i] = '\0';
 }
 
@@ -215,6 +238,7 @@ uint8_t pollDisplay() {
   http.end();
   forgetIp(code);
   if (code != 200) return roleState.role;
+  if (jsonBool(body, "shutdown")) shutdownRequestedFlag = true;
 
   RoleInfo r;
   char roleText[12];
@@ -441,6 +465,7 @@ size_t queued() { return qCount; }
 int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
 
 char letter() { return tasterLetter; }
+bool shutdownRequested() { return shutdownRequestedFlag; }
 
 bool roleInfo(RoleInfo& out) {
   portENTER_CRITICAL(&roleMux);

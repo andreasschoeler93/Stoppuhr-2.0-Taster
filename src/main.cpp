@@ -51,6 +51,11 @@ void setup() {
 }
 
 void loop() {
+  if (netlink::shutdownRequested()) {
+    digitalWrite(cfg::Pins::HOLD, LOW);
+    return;
+  }
+
   beep::tick();
   int64_t pressUs = 0;
   if (button::pressed(&pressUs)) {

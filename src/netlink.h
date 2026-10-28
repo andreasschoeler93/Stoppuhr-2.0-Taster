@@ -18,6 +18,7 @@ uint8_t wifiLevel();
 int wifiRssi();
 // Vom Server vergebener Buchstabe (A-J); '?' bis zur Anmeldung
 char letter();
+bool shutdownRequested();
 
 // Anzeigedaten der Rolle (Starter/Bahn), vom Server per GET /api/display geholt.
 struct RoleInfo {

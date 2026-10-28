@@ -53,11 +53,24 @@ int32_t shownTime(const netlink::RoleInfo& ri) {
 }
 
 // Kuerzt Text mit "..." so, dass er in die Bildschirmbreite passt.
-void printFitted(const char* text, int baselineY) {
+void printFitted(const char* text, int baselineY, uint16_t color) {
   GFXcanvas16& c = display::canvas();
   char buf[40];
-  strncpy(buf, text, sizeof(buf) - 1);
-  buf[sizeof(buf) - 1] = '\0';
+  uint8_t umlauts[sizeof(buf)] = {};
+  size_t i = 0;
+  while (*text && i < sizeof(buf) - 1) {
+    char ch = *text++;
+    switch ((uint8_t)ch) {
+      case 0x01: ch = 'a'; umlauts[i] = 1; break;
+      case 0x02: ch = 'o'; umlauts[i] = 2; break;
+      case 0x03: ch = 'u'; umlauts[i] = 3; break;
+      case 0x04: ch = 'A'; umlauts[i] = 4; break;
+      case 0x05: ch = 'O'; umlauts[i] = 5; break;
+      case 0x06: ch = 'U'; umlauts[i] = 6; break;
+    }
+    buf[i++] = ch;
+  }
+  buf[i] = '\0';
   const int maxW = cfg::Screen::W - 2 * cfg::Screen::SAFE;
   for (;;) {
     int16_t xb, yb;
@@ -70,7 +83,26 @@ void printFitted(const char* text, int baselineY) {
     buf[n - 2] = '.';
     buf[n - 1] = '\0';
   }
-  printCentered(buf, baselineY);
+
+  int16_t xb, yb;
+  uint16_t w, h;
+  c.getTextBounds(buf, 0, 0, &xb, &yb, &w, &h);
+  int16_t cursorX = (cfg::Screen::W - (int)w) / 2;
+  c.setCursor(cursorX, baselineY);
+  for (size_t j = 0; buf[j]; ++j) {
+    if (umlauts[j]) {
+      char glyph[2] = {buf[j], '\0'};
+      int16_t gx, gy;
+      uint16_t gw, gh;
+      c.getTextBounds(glyph, cursorX, baselineY, &gx, &gy, &gw, &gh);
+      int16_t dotX = gx + (int16_t)gw / 2;
+      int16_t dotY = gy - 2;
+      c.fillCircle(dotX - 2, dotY, 1, color);
+      c.fillCircle(dotX + 2, dotY, 1, color);
+    }
+    c.write((uint8_t)buf[j]);
+    cursorX = c.getCursorX();
+  }
 }
 
 void drawTime(const netlink::RoleInfo& ri, uint16_t bg) {
@@ -217,10 +249,10 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
   drawTime(ri, bg);
 
   c.setFont(&FreeSans12pt7b);
-  printFitted(ri.name, cfg::Layout::ROLE_NAME_Y);
+  printFitted(ri.name, cfg::Layout::ROLE_NAME_Y, cfg::Colors::WHITE);
   c.setFont(&FreeSans9pt7b);
   c.setTextColor(cfg::Colors::SUB);
-  printFitted(ri.discipline, cfg::Layout::ROLE_DISCIPLINE_Y);
+  printFitted(ri.discipline, cfg::Layout::ROLE_DISCIPLINE_Y, cfg::Colors::SUB);
 
   c.drawFastHLine(cfg::Screen::SAFE, cfg::Layout::ROLE_SEPARATOR_Y, cfg::Screen::W - 2 * cfg::Screen::SAFE,
                   cfg::Colors::SUB);
@@ -239,7 +271,7 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
     else snprintf(meta, sizeof(meta), "%s", ri.lastName);
     c.setFont(&FreeSans9pt7b);
     c.setTextColor(cfg::Colors::SUB);
-    printFitted(meta, cfg::Layout::ROLE_LAST_META_Y);
+    printFitted(meta, cfg::Layout::ROLE_LAST_META_Y, cfg::Colors::SUB);
   }
 
   display::renderBottomBar(bg, letter, m);
