@@ -208,9 +208,9 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
     if (pendingLane == netlink::RoleInfo::PENDING_STARTER) snprintf(hint, sizeof(hint), "Bereit: Start");
     else snprintf(hint, sizeof(hint), "Bereit: Bahn %u", pendingLane);
     c.setTextColor(cfg::Colors::WHITE);
-    printCentered(hint, 224);
+    printCentered(hint, 204);
     c.setTextColor(cfg::Colors::GREY);
-    printCentered("Taste = Tausch", 246);
+    printCentered("Taste = Tausch", 228);
   }
 
 #if VBAT_SCREEN_DEBUG
