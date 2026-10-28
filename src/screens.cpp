@@ -179,7 +179,7 @@ void drawSplash(char letter, const measure::Data& m) {
   display::renderBottomBar(cfg::Colors::SPLASH, letter, m);
 }
 
-uint16_t drawAssign(char letter, const measure::Data& m) {
+uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
   if (!display::ready()) return cfg::Colors::PREP_BG;
 
   GFXcanvas16& c = display::canvas();
@@ -200,7 +200,18 @@ uint16_t drawAssign(char letter, const measure::Data& m) {
 
   c.setFont(&FreeSans9pt7b);
   c.setTextColor(cfg::Colors::GREY);
-  printCentered("Taste: Starter", 230);
+  if (pendingLane == 0) {
+    printCentered("Taste: Starter", 230);
+  } else {
+    // Bereitschaft: Tausch wartet auf den ersten Tastendruck vor Ort
+    char hint[24];
+    if (pendingLane == netlink::RoleInfo::PENDING_STARTER) snprintf(hint, sizeof(hint), "Bereit: Start");
+    else snprintf(hint, sizeof(hint), "Bereit: Bahn %u", pendingLane);
+    c.setTextColor(cfg::Colors::WHITE);
+    printCentered(hint, 224);
+    c.setTextColor(cfg::Colors::GREY);
+    printCentered("Taste = Tausch", 246);
+  }
 
 #if VBAT_SCREEN_DEBUG
   char dbg[40];

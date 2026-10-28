@@ -8,7 +8,7 @@ namespace screens {
 
 void drawSplash(char letter, const measure::Data& m);
 // Gibt die Hintergrundfarbe zurueck (fuer spaetere Updates der unteren Leiste).
-uint16_t drawAssign(char letter, const measure::Data& m);
+uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane = 0);
 
 // Rollenansicht "Start" bzw. "Bahn N" mit Zeit, Name, Disziplin und letzter Zeit.
 void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m);

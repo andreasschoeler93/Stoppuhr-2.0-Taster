@@ -272,6 +272,10 @@ uint8_t pollDisplay() {
           : !strcmp(stateText, "inactive") ? RoleInfo::INACTIVE
                                            : RoleInfo::READY;
   r.lane = (uint8_t)jsonInt(body, "lane", 0);
+  char pendingText[12];
+  jsonStr(body, "pending_lane", pendingText, sizeof(pendingText));
+  r.pendingLane = !strcmp(pendingText, "starter") ? RoleInfo::PENDING_STARTER
+                                                  : (uint8_t)atoi(pendingText);
   r.run = (uint16_t)jsonInt(body, "run", 0);
   r.attempt = (uint16_t)jsonInt(body, "attempt", 1);
   r.elapsedMs = jsonInt(body, "elapsed_ms", 0);
@@ -305,6 +309,7 @@ uint8_t pollDisplay() {
 
   portENTER_CRITICAL(&roleMux);
   bool same = roleValid && r.role == roleState.role && r.state == roleState.state &&
+              r.pendingLane == roleState.pendingLane &&
               r.lane == roleState.lane && r.run == roleState.run && r.attempt == roleState.attempt &&
               r.timeMs == roleState.timeMs && r.lastMs == roleState.lastMs &&
               r.lastRun == roleState.lastRun && r.lastAttempt == roleState.lastAttempt &&
@@ -355,12 +360,12 @@ bool deliver(const Event& e) {
 // Zweites WLAN (Bad) ist nur aktiv, wenn eine SSID dafuer konfiguriert ist.
 bool badWifiConfigured() { return cfg::Net::WIFI2_SSID[0] != '\0'; }
 
-// Taster mit Rolle gehoeren ins Bad-WLAN, alle anderen ins Koffer-WLAN.
-// Die Rolle bleibt gespeichert, auch wenn das Bad-WLAN gerade nicht erreichbar ist.
+// Taster mit Rolle oder in Bereitschaft (Tausch vorgemerkt) gehoeren ins Bad-WLAN,
+// alle anderen ins Koffer-WLAN. Das gilt auch, wenn das Bad-WLAN gerade nicht erreichbar ist.
 bool wantBadWifi() {
   if (!badWifiConfigured()) return false;
   portENTER_CRITICAL(&roleMux);
-  bool want = roleValid && roleState.role != RoleInfo::NONE;
+  bool want = roleValid && (roleState.role != RoleInfo::NONE || roleState.pendingLane != 0);
   portEXIT_CRITICAL(&roleMux);
   return want;
 }

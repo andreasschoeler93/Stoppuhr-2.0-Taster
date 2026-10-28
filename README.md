@@ -213,6 +213,10 @@ Multimeter messen und mit dem Logwert `battery` vergleichen.
 
 Mit `SECRET_WIFI2_SSID`/`SECRET_WIFI2_PASS` in `src/secrets.h` kennt der Taster ein zweites WLAN. Ohne Rolle ist er im ersten (Koffer-WLAN), mit Rolle wechselt er sofort ins zweite (Bad-WLAN), auch wenn dieses gerade nicht erreichbar ist. Zurück geht er nur, wenn die Rolle entzogen wird. Bleibt `SECRET_WIFI2_SSID` leer, verhält er sich wie bisher. Aufbau der Pis: siehe `deploy/zwei-pi/README.md` im Stoppuhr-Repository.
 
+## Taster tauschen (Bereitschaft, ab v0.10.2)
+
+Wird ein Taster auf eine bereits belegte Bahn gezogen, zeigt er „Bereit: Bahn N“ und wechselt ins zweite (Bad-)WLAN. Der erste Tastendruck vor Ort tauscht die Rollen, sofern kein Lauf läuft. Der Druck zählt nicht als Messung.
+
 ## Bauen und Hochladen
 
 Das PlatformIO-Projekt verwendet die Umgebung `seeed_xiao_esp32s3`:

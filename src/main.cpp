@@ -28,6 +28,7 @@ char assignLetter = '?';
 uint16_t assignBg = cfg::Colors::PREP_BG;
 bool pendingButtonPress = false;
 bool longPressSent = false;
+uint8_t shownPending = 0;
 int64_t pendingPressUs = 0;
 
 }  // namespace
@@ -88,6 +89,8 @@ void loop() {
   }
   netlink::RoleInfo ri;
   const bool haveRole = netlink::roleInfo(ri) && ri.role != netlink::RoleInfo::NONE;
+  // Bereitschaft nur ohne Rolle; Anzeige wechselt bei jeder Aenderung
+  const uint8_t pendingLane = haveRole ? 0 : ri.pendingLane;
   if (pendingButtonPress) {
     if (!longPressSent && haveRole && ri.role == netlink::RoleInfo::STARTER && button::down() &&
         esp_timer_get_time() - pendingPressUs >=
@@ -137,7 +140,8 @@ void loop() {
         screens::drawRole(ri, assignLetter, m);
       } else {
         uiMode = UiMode::ASSIGN;
-        assignBg = screens::drawAssign(assignLetter, m);
+        shownPending = pendingLane;
+        assignBg = screens::drawAssign(assignLetter, m, pendingLane);
       }
     } else if (changed) {
       display::renderBottomBar(cfg::Colors::SPLASH, assignLetter, m);
@@ -156,9 +160,10 @@ void loop() {
       lastClockMs = millis();
       screens::drawRoleClock(ri);
     }
-  } else if (uiMode == UiMode::ROLE || (changed & measure::CHANGED_BATTERY)) {
+  } else if (uiMode == UiMode::ROLE || pendingLane != shownPending || (changed & measure::CHANGED_BATTERY)) {
     uiMode = UiMode::ASSIGN;
-    assignBg = screens::drawAssign(assignLetter, m);
+    shownPending = pendingLane;
+    assignBg = screens::drawAssign(assignLetter, m, pendingLane);
   } else if (changed & measure::CHANGED_BAR) {
     display::renderBottomBar(assignBg, assignLetter, m);
   }

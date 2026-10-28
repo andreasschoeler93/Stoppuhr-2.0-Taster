@@ -27,6 +27,9 @@ struct RoleInfo {
   enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2 };
   enum State : uint8_t { READY = 0, RUNNING = 1, STOPPED = 2, INACTIVE = 3 };
   uint8_t role = NONE;
+  // Bereitschaft: Tausch vorgemerkt, 0 = keiner, 1..N = Bahn, PENDING_STARTER = Starter
+  static constexpr uint8_t PENDING_STARTER = 255;
+  uint8_t pendingLane = 0;
   uint8_t state = READY;
   uint8_t lane = 0;
   uint16_t run = 0;
