@@ -135,7 +135,7 @@ int postAbortRun(const Event& e) {
 void postVitals() {
   if (WiFi.status() != WL_CONNECTED) return;
   const measure::Data m = measure::data();
-  char body[256];
+  char body[320];
   char t[16], h[16];
   if (m.ahtOk && isfinite(m.temperature) && isfinite(m.humidity)) {
     snprintf(t, sizeof(t), "%.1f", m.temperature);
@@ -152,9 +152,9 @@ void postVitals() {
   if (nowEpoch != 0) snprintf(clock, sizeof(clock), ",\"clock_ms\":%llu", (unsigned long long)nowEpoch);
   snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
-           "\"vbat\":%.3f,\"rssi\":%d,\"fw\":\"%s\",\"uptime_s\":%lu%s}",
+           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu%s}",
            deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
-           WiFi.RSSI(), FW_VERSION, (unsigned long)(millis() / 1000), clock);
+           WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000), clock);
 
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
