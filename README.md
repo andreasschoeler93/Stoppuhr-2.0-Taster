@@ -209,6 +209,10 @@ Spannungsteiler, die gemeinsame Masse und die Ansteuerung von MEAS_EN
 0 V und kleiner als 3,3 V sein. Zum Gegencheck die Akkuspannung mit einem
 Multimeter messen und mit dem Logwert `battery` vergleichen.
 
+## Zwei WLANs (Koffer und Bad, ab v0.10.0)
+
+Mit `SECRET_WIFI2_SSID`/`SECRET_WIFI2_PASS` in `src/secrets.h` kennt der Taster ein zweites WLAN. Ohne Rolle ist er im ersten (Koffer-WLAN), mit Rolle wechselt er sofort ins zweite (Bad-WLAN), auch wenn dieses gerade nicht erreichbar ist. Zurück geht er nur, wenn die Rolle entzogen wird. Bleibt `SECRET_WIFI2_SSID` leer, verhält er sich wie bisher. Aufbau der Pis: siehe `deploy/zwei-pi/README.md` im Stoppuhr-Repository.
+
 ## Bauen und Hochladen
 
 Das PlatformIO-Projekt verwendet die Umgebung `seeed_xiao_esp32s3`:

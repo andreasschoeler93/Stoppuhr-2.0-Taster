@@ -13,6 +13,12 @@
 #ifndef SECRET_WIFI_PASS
 #define SECRET_WIFI_PASS ""
 #endif
+#ifndef SECRET_WIFI2_SSID
+#define SECRET_WIFI2_SSID ""
+#endif
+#ifndef SECRET_WIFI2_PASS
+#define SECRET_WIFI2_PASS ""
+#endif
 #ifndef SECRET_PI_IP
 #define SECRET_PI_IP "192.168.178.50"
 #endif
@@ -26,8 +32,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 9
-#define FW_VERSION_PATCH 1
+#define FW_VERSION_MINOR 10
+#define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -126,6 +132,9 @@ struct Net {
   // Das WLAN des Pi ist versteckt und passwortgeschuetzt (Werte aus secrets.h)
   static constexpr const char* WIFI_SSID = SECRET_WIFI_SSID;
   static constexpr const char* WIFI_PASS = SECRET_WIFI_PASS;
+  // Zweites WLAN (Bad) fuer Taster mit Rolle; leere SSID = Einzel-WLAN wie bisher
+  static constexpr const char* WIFI2_SSID = SECRET_WIFI2_SSID;
+  static constexpr const char* WIFI2_PASS = SECRET_WIFI2_PASS;
   // Statische Pi-IP (kein DNS noetig); auch als NTP-Quelle fuer den Zeitstempel
   static constexpr const char* PI_HOST = SECRET_PI_IP;
   static constexpr uint16_t PI_PORT = 1999;

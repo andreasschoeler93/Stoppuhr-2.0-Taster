@@ -352,16 +352,45 @@ bool deliver(const Event& e) {
   return false;
 }
 
+// Zweites WLAN (Bad) ist nur aktiv, wenn eine SSID dafuer konfiguriert ist.
+bool badWifiConfigured() { return cfg::Net::WIFI2_SSID[0] != '\0'; }
+
+// Taster mit Rolle gehoeren ins Bad-WLAN, alle anderen ins Koffer-WLAN.
+// Die Rolle bleibt gespeichert, auch wenn das Bad-WLAN gerade nicht erreichbar ist.
+bool wantBadWifi() {
+  if (!badWifiConfigured()) return false;
+  portENTER_CRITICAL(&roleMux);
+  bool want = roleValid && roleState.role != RoleInfo::NONE;
+  portEXIT_CRITICAL(&roleMux);
+  return want;
+}
+
+void connectProfile(bool bad) {
+  WiFi.disconnect();
+  if (bad) WiFi.begin(cfg::Net::WIFI2_SSID, cfg::Net::WIFI2_PASS);
+  else WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
+}
+
 void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
   uint32_t lastVitalsMs = 0;
   uint32_t lastRegisterMs = 0;
   bool registered = false;
+  bool onBadWifi = false;
   for (;;) {
-    if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
+    bool wantBad = wantBadWifi();
+    if (wantBad != onBadWifi) {
+      // Rollenwechsel: sofort ins passende WLAN, auch wenn es noch nicht erreichbar ist
+      onBadWifi = wantBad;
+      registered = false;
       lastWifiTryMs = millis();
-      WiFi.disconnect();
-      WiFi.begin(cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS);
+      connectProfile(onBadWifi);
+#if DBG
+      Serial.printf("[WIFI] wechsle ins %s-WLAN\n", onBadWifi ? "Bad" : "Koffer");
+#endif
+    } else if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
+      lastWifiTryMs = millis();
+      connectProfile(onBadWifi);
     }
     Event e;
     if (peek(e)) {
