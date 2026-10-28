@@ -26,7 +26,7 @@ beim Start im seriellen Monitor.
 - **MAJOR**: grundlegende Änderungen (Hardware, Bedienkonzept); `1.0.0` = erste fertige Version
 
 Bei jedem Release: Version erhöhen, committen und mit `git tag vX.Y.Z` markieren.
-Aktuell: `v0.8.8`.
+Aktuell: `v0.9.1`.
 
 Der Display-Bildspeicher belegt rund 131 KiB RAM. Kann er nicht angelegt
 werden, meldet die Firmware `[GFX] ERROR` im seriellen Monitor und ueberspringt
@@ -57,9 +57,14 @@ Geplante Module (noch nicht angelegt, je ein eigener Minor-Schritt):
 
 ## Taster ↔ Pi Schnittstelle
 
-Bei jedem Tastendruck sendet der Taster `POST /api/triggers` an den Pi
-(Repo `Stoppuhr`). Nur internes WLAN/LAN, keine Cloud. Das Senden läuft in
-einem eigenen Task (`src/netlink.cpp`), `loop()` blockiert nie.
+Der Starter unterscheidet einen kurzen Tastendruck von einem Langdruck:
+Nach 2 Sekunden bricht ein Langdruck den laufenden Versuch ab und bereitet eine neue
+Version desselben Laufs vor. Die neue Version kann erst nach Ablauf der Stopp-Sperre
+mit einem kurzen Druck gestartet werden. Bahn-Taster behalten ihr normales
+Start-/Stoppverhalten. Kurze Tastendrücke senden `POST /api/triggers`, der Langdruck
+des Starters sendet `POST /api/abort-run` an den Pi (Repo `Stoppuhr`). Nur internes
+WLAN/LAN, keine Cloud. Das Senden läuft in einem eigenen Task (`src/netlink.cpp`),
+`loop()` blockiert nie.
 
 Request (`Content-Type: application/json`, `Accept: application/json`,
 `X-Api-Key` nur wenn konfiguriert):
@@ -70,6 +75,12 @@ Request (`Content-Type: application/json`, `Accept: application/json`,
 
 Antwort Erfolg: `{"ok":true,"received_at":1761290000150,"event_id":"..."}`;
 Fehler: `{"ok":false,"error":"...","code":"..."}`.
+
+Anforderung zum Abbrechen und Wiederholen:
+
+```json
+{"mac":"AA:BB:CC:DD:EE:01","request_id":"AA:BB:CC:DD:EE:01:123456789"}
+```
 
 ### Konfiguration (`cfg::Net` in `src/config.h`)
 

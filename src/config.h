@@ -26,8 +26,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 8
-#define FW_VERSION_PATCH 8
+#define FW_VERSION_MINOR 9
+#define FW_VERSION_PATCH 1
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -109,6 +109,7 @@ struct Layout {
 
 struct Timing {
   static constexpr uint32_t DEBOUNCE_MS = 40;
+  static constexpr uint32_t STARTER_LONG_PRESS_MS = 2000;
   static constexpr uint32_t SPLASH_MS = 5000;
   static constexpr uint32_t AHT_POLL_MS = 2000;
   static constexpr uint8_t AHT_FAIL_REINIT_AFTER = 3;

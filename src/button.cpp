@@ -42,4 +42,8 @@ bool pressed(int64_t* pressTimeUs) {
   return hit;
 }
 
+bool down() {
+  return digitalRead(cfg::Pins::BUTTON) == LOW;
+}
+
 }  // namespace button

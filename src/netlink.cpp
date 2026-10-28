@@ -17,6 +17,7 @@ namespace {
 struct Event {
   uint32_t id;
   int64_t pressUs;
+  bool abortRun;
 };
 
 Event queue[cfg::Net::QUEUE_MAX];
@@ -98,6 +99,24 @@ int postTrigger(const Event& e, int64_t ts) {
   String url = baseUrl() + "/api/triggers";
   String body = String("{\"mac\":\"") + deviceMac + "\",\"ts\":" + String((unsigned long long)ts) +
                 ",\"stopwatch_ms\":null,\"run_id\":null}";
+  HTTPClient http;
+  http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  if (!http.begin(url)) return -1;
+  http.addHeader("Accept", "application/json");
+  http.addHeader("Content-Type", "application/json");
+  if (cfg::Net::API_KEY[0]) http.addHeader("X-Api-Key", cfg::Net::API_KEY);
+  int code = http.POST(body);
+  http.end();
+  forgetIp(code);
+  return code;
+}
+
+int postAbortRun(const Event& e) {
+  String url = baseUrl() + "/api/abort-run";
+  String requestId = deviceMac + ":" + String((unsigned long long)e.pressUs);
+  String body = String("{\"mac\":\"") + deviceMac + "\",\"request_id\":\"" + requestId + "\"}";
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
@@ -254,10 +273,12 @@ uint8_t pollDisplay() {
                                            : RoleInfo::READY;
   r.lane = (uint8_t)jsonInt(body, "lane", 0);
   r.run = (uint16_t)jsonInt(body, "run", 0);
+  r.attempt = (uint16_t)jsonInt(body, "attempt", 1);
   r.elapsedMs = jsonInt(body, "elapsed_ms", 0);
   r.timeMs = jsonInt(body, "time_ms", -1);
   r.lastMs = jsonInt(body, "last_ms", -1);
   r.lastRun = (uint16_t)jsonInt(body, "last_run", 0);
+  r.lastAttempt = (uint16_t)jsonInt(body, "last_attempt", 1);
   jsonStr(body, "name", r.name, sizeof(r.name));
   jsonStr(body, "discipline", r.discipline, sizeof(r.discipline));
   jsonStr(body, "last_name", r.lastName, sizeof(r.lastName));
@@ -284,8 +305,9 @@ uint8_t pollDisplay() {
 
   portENTER_CRITICAL(&roleMux);
   bool same = roleValid && r.role == roleState.role && r.state == roleState.state &&
-              r.lane == roleState.lane && r.run == roleState.run && r.timeMs == roleState.timeMs &&
-              r.lastMs == roleState.lastMs && r.lastRun == roleState.lastRun &&
+              r.lane == roleState.lane && r.run == roleState.run && r.attempt == roleState.attempt &&
+              r.timeMs == roleState.timeMs && r.lastMs == roleState.lastMs &&
+              r.lastRun == roleState.lastRun && r.lastAttempt == roleState.lastAttempt &&
               !strcmp(r.name, roleState.name) && !strcmp(r.discipline, roleState.discipline) &&
               !strcmp(r.lastName, roleState.lastName) && r.laneCount == roleState.laneCount &&
               !memcmp(r.lanes, roleState.lanes, sizeof(r.lanes));
@@ -301,11 +323,12 @@ uint8_t pollDisplay() {
 
 // Eine Zustellung mit Retry/Backoff. true: Event erledigt (entfernen).
 bool deliver(const Event& e) {
-  int64_t ts = epochMsFor(e.pressUs);
-  if (ts == 0 || WiFi.status() != WL_CONNECTED) return false;
+  if (WiFi.status() != WL_CONNECTED) return false;
+  int64_t ts = e.abortRun ? 0 : epochMsFor(e.pressUs);
+  if (!e.abortRun && ts == 0) return false;
   uint32_t backoff = cfg::Net::RETRY_BACKOFF_MS;
   for (int attempt = 1; attempt <= cfg::Net::RETRY_COUNT; attempt++) {
-    int code = postTrigger(e, ts);
+    int code = e.abortRun ? postAbortRun(e) : postTrigger(e, ts);
     if (code == 200) {
       logLine(e.id, attempt, code, "sent");
       return true;
@@ -435,12 +458,7 @@ void begin() {
   xTaskCreate(displayTask, "display", 8192, nullptr, 1, nullptr);
 }
 
-bool sendTrigger(int64_t pressUs) {
-  uint32_t now = millis();
-  if (haveTrigger && now - lastTriggerMs < cfg::Net::TRIGGER_MIN_INTERVAL_MS) return false;
-  haveTrigger = true;
-  lastTriggerMs = now;
-
+bool enqueueEvent(int64_t pressUs, bool abortRun) {
   uint32_t id = ++counter;
   bool queuedOk = false;
   bool dropped = false;
@@ -451,13 +469,25 @@ bool sendTrigger(int64_t pressUs) {
     dropped = true;
   }
   if (cfg::Net::ENABLE_OFFLINE_QUEUE || qCount == 0) {
-    queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, pressUs};
+    queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, pressUs, abortRun};
     qCount++;
     queuedOk = true;
   }
   portEXIT_CRITICAL(&qMux);
   if (dropped) logLine(id, 0, 0, "dropped");
   return queuedOk;
+}
+
+bool sendTrigger(int64_t pressUs) {
+  uint32_t now = millis();
+  if (haveTrigger && now - lastTriggerMs < cfg::Net::TRIGGER_MIN_INTERVAL_MS) return false;
+  haveTrigger = true;
+  lastTriggerMs = now;
+  return enqueueEvent(pressUs, false);
+}
+
+bool sendAbortRun(int64_t pressUs) {
+  return enqueueEvent(pressUs, true);
 }
 
 size_t queued() { return qCount; }

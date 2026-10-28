@@ -6,6 +6,7 @@
 */
 
 #include <Arduino.h>
+#include <esp_timer.h>
 
 #include "beep.h"
 #include "button.h"
@@ -25,6 +26,9 @@ uint32_t lastClockMs = 0;
 uint32_t modeStartedMs = 0;
 char assignLetter = '?';
 uint16_t assignBg = cfg::Colors::PREP_BG;
+bool pendingButtonPress = false;
+bool longPressSent = false;
+int64_t pendingPressUs = 0;
 
 }  // namespace
 
@@ -59,8 +63,9 @@ void loop() {
   beep::tick();
   int64_t pressUs = 0;
   if (button::pressed(&pressUs)) {
-    netlink::sendTrigger(pressUs);
-    beep::click();
+    pendingPressUs = pressUs;
+    pendingButtonPress = true;
+    longPressSent = false;
   }
 
   uint8_t changed = measure::update();
@@ -83,6 +88,21 @@ void loop() {
   }
   netlink::RoleInfo ri;
   const bool haveRole = netlink::roleInfo(ri) && ri.role != netlink::RoleInfo::NONE;
+  if (pendingButtonPress) {
+    if (!longPressSent && haveRole && ri.role == netlink::RoleInfo::STARTER && button::down() &&
+        esp_timer_get_time() - pendingPressUs >=
+            (int64_t)cfg::Timing::STARTER_LONG_PRESS_MS * 1000) {
+      netlink::sendAbortRun(pendingPressUs);
+      beep::click();
+      longPressSent = true;
+    } else if (!button::down()) {
+      if (!longPressSent) {
+        netlink::sendTrigger(pendingPressUs);
+        beep::click();
+      }
+      pendingButtonPress = false;
+    }
+  }
 
   // Dumpfer Ton: Bahn-Taster bei Laufstart, Starter bei jeder gestoppten Bahn.
   // Der erste Datensatz nach dem Einschalten loest nichts aus.

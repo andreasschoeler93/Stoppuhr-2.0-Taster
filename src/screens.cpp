@@ -232,8 +232,9 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
   c.setFont(&FreeSans12pt7b);
   c.setCursor(cfg::Screen::SAFE, cfg::Layout::ROLE_HEADER_Y);
   c.print(head);
-  char run[12];
-  snprintf(run, sizeof(run), "Lauf %u", ri.run);
+  char run[20];
+  if (ri.attempt > 1) snprintf(run, sizeof(run), "Lauf %u/%u", ri.run, ri.attempt);
+  else snprintf(run, sizeof(run), "Lauf %u", ri.run);
   int16_t xb, yb;
   uint16_t w, h;
   c.getTextBounds(run, 0, 0, &xb, &yb, &w, &h);
@@ -267,7 +268,10 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
   printCentered(last, cfg::Layout::ROLE_LAST_TIME_Y);
   if (ri.lastMs >= 0) {
     char meta[40];
-    if (starter || !ri.lastName[0]) snprintf(meta, sizeof(meta), "Lauf %u", ri.lastRun);
+    if (starter || !ri.lastName[0]) {
+      if (ri.lastAttempt > 1) snprintf(meta, sizeof(meta), "Lauf %u/%u", ri.lastRun, ri.lastAttempt);
+      else snprintf(meta, sizeof(meta), "Lauf %u", ri.lastRun);
+    }
     else snprintf(meta, sizeof(meta), "%s", ri.lastName);
     c.setFont(&FreeSans9pt7b);
     c.setTextColor(cfg::Colors::SUB);

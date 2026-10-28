@@ -11,6 +11,8 @@ void begin();
 // Gibt false zurueck, wenn er durch Entprellung verworfen wurde.
 // pressUs: esp_timer-Zeit (Mikrosekunden) des Tastendrucks.
 bool sendTrigger(int64_t pressUs);
+// Legt die Anforderung zum Abbrechen und Wiederholen des aktuellen Laufs in die Warteschlange.
+bool sendAbortRun(int64_t pressUs);
 size_t queued();
 // 0 = nicht verbunden, 1..4 = Signalstaerke
 uint8_t wifiLevel();
@@ -28,11 +30,13 @@ struct RoleInfo {
   uint8_t state = READY;
   uint8_t lane = 0;
   uint16_t run = 0;
+  uint16_t attempt = 1;
   int32_t elapsedMs = 0;  // Laufzeit zum Empfangszeitpunkt (nur RUNNING)
   int32_t timeMs = -1;    // gestoppte Zeit, -1 = keine
   uint32_t recvMs = 0;    // millis() beim Empfang
   int32_t lastMs = -1;    // letzte abgeschlossene Zeit, -1 = keine
   uint16_t lastRun = 0;
+  uint16_t lastAttempt = 1;
   uint32_t seq = 0;       // zaehlt hoch, wenn sich der Inhalt (ausser der Uhr) aendert
   char name[32] = "";
   char discipline[32] = "";
