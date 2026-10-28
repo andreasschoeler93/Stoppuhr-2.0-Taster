@@ -27,6 +27,12 @@ uint32_t modeStartedMs = 0;
 char assignLetter = '?';
 uint16_t assignBg = cfg::Colors::PREP_BG;
 bool pendingButtonPress = false;
+bool localStop = false;
+bool lastLocalShown = false;
+int32_t localStopMs = 0;
+uint16_t localStopRun = 0;
+uint16_t localStopAttempt = 0;
+uint32_t localStopAtMs = 0;
 bool longPressSent = false;
 uint8_t shownPending = 0;
 int64_t pendingPressUs = 0;
@@ -96,10 +102,23 @@ void loop() {
         esp_timer_get_time() - pendingPressUs >=
             (int64_t)cfg::Timing::STARTER_LONG_PRESS_MS * 1000) {
       netlink::sendAbortRun(pendingPressUs);
-      beep::click();
+      beep::abortRun();
       longPressSent = true;
     } else if (!button::down()) {
       if (!longPressSent) {
+        // Bahn: Stoppzeit sofort selbst berechnen und anzeigen, der Server bestaetigt sie spaeter
+        if (haveRole && ri.role == netlink::RoleInfo::LANE && ri.state == netlink::RoleInfo::RUNNING &&
+            !localStop) {
+          const uint32_t pressMs = millis() - (uint32_t)((esp_timer_get_time() - pendingPressUs) / 1000);
+          const int32_t ms = ri.elapsedMs + (int32_t)(pressMs - ri.recvMs);
+          if (ms >= 0) {
+            localStop = true;
+            localStopMs = ms;
+            localStopRun = ri.run;
+            localStopAttempt = ri.attempt;
+            localStopAtMs = millis();
+          }
+        }
         netlink::sendTrigger(pendingPressUs);
         beep::click();
       }
@@ -132,6 +151,24 @@ void loop() {
     sigStopped = stopped;
   }
 
+  // Lokale Stoppzeit anzeigen, bis der Server den Stopp bestaetigt (oder verwirft)
+  bool localShown = false;
+  if (localStop) {
+    // Solange der Druck noch nicht beim Server angekommen ist, bleibt die lokale Zeit stehen
+    if (netlink::queued() > 0) localStopAtMs = millis();
+    if (haveRole && ri.role == netlink::RoleInfo::LANE && ri.run == localStopRun &&
+        ri.attempt == localStopAttempt && ri.state == netlink::RoleInfo::RUNNING &&
+        millis() - localStopAtMs < cfg::Timing::LOCAL_STOP_HOLD_MS) {
+      ri.state = netlink::RoleInfo::STOPPED;
+      ri.timeMs = localStopMs;
+      localShown = true;
+    } else {
+      localStop = false;
+    }
+  }
+  const bool localChanged = localShown != lastLocalShown;
+  lastLocalShown = localShown;
+
   if (uiMode == UiMode::SPLASH) {
     if (millis() - modeStartedMs >= cfg::Timing::SPLASH_MS) {
       if (haveRole) {
@@ -148,7 +185,7 @@ void loop() {
     }
   } else if (haveRole) {
     // Rollenansicht: Vollbild bei Aenderung, sonst nur das Zeitfeld
-    if (uiMode != UiMode::ROLE || ri.seq != roleSeq || (changed & measure::CHANGED_BATTERY)) {
+    if (uiMode != UiMode::ROLE || ri.seq != roleSeq || localChanged || (changed & measure::CHANGED_BATTERY)) {
       uiMode = UiMode::ROLE;
       roleSeq = ri.seq;
       screens::drawRole(ri, assignLetter, m);

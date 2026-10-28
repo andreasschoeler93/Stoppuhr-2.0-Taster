@@ -33,7 +33,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 10
-#define FW_VERSION_PATCH 3
+#define FW_VERSION_PATCH 6
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -116,6 +116,8 @@ struct Layout {
 struct Timing {
   static constexpr uint32_t DEBOUNCE_MS = 40;
   static constexpr uint32_t STARTER_LONG_PRESS_MS = 2000;
+  // So lange zeigt die Bahn die selbst gemessene Stoppzeit, bis der Server sie bestaetigt
+  static constexpr uint32_t LOCAL_STOP_HOLD_MS = 2500;
   static constexpr uint32_t SPLASH_MS = 5000;
   static constexpr uint32_t AHT_POLL_MS = 2000;
   static constexpr uint8_t AHT_FAIL_REINIT_AFTER = 3;
@@ -153,11 +155,11 @@ struct Net {
   static constexpr const char* API_KEY = SECRET_API_KEY;
   static constexpr uint32_t HTTP_TIMEOUT_MS = 1000;
   static constexpr uint8_t RETRY_COUNT = 3;
-  static constexpr uint32_t RETRY_BACKOFF_MS = 200;
+  static constexpr uint32_t RETRY_BACKOFF_MS = 100;
   static constexpr bool ENABLE_OFFLINE_QUEUE = true;
   static constexpr size_t QUEUE_MAX = 32;
   static constexpr uint32_t TRIGGER_MIN_INTERVAL_MS = 300;
-  static constexpr uint32_t FLUSH_RETRY_MS = 3000;
+  static constexpr uint32_t FLUSH_RETRY_MS = 500;
   static constexpr uint32_t VITALS_INTERVAL_MS = 10000;
   static constexpr uint32_t WIFI_RETRY_MS = 5000;
 };

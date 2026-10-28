@@ -37,6 +37,7 @@ portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
 // Pi-Adresse einmal aufloesen und merken: ein Namensabruf pro Anfrage kostete teils Sekunden.
 volatile uint32_t piIp = 0;
 volatile bool pollNow = false;
+volatile bool reregisterNow = false;
 
 String baseUrl() {
   uint32_t ip = piIp;
@@ -378,16 +379,13 @@ void connectProfile(bool bad) {
 
 void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
-  uint32_t lastVitalsMs = 0;
-  uint32_t lastRegisterMs = 0;
-  bool registered = false;
   bool onBadWifi = false;
   for (;;) {
     bool wantBad = wantBadWifi();
     if (wantBad != onBadWifi) {
       // Rollenwechsel: sofort ins passende WLAN, auch wenn es noch nicht erreichbar ist
       onBadWifi = wantBad;
-      registered = false;
+      reregisterNow = true;
       lastWifiTryMs = millis();
       connectProfile(onBadWifi);
 #if DBG
@@ -410,17 +408,32 @@ void netTask(void*) {
         vTaskDelay(pdMS_TO_TICKS(cfg::Net::FLUSH_RETRY_MS));
       }
     } else {
-      // Anmeldung regelmaessig wiederholen: der Server vergisst Taster z. B. nach einem Reset
-      if (millis() - lastRegisterMs >= (registered ? cfg::Net::REREGISTER_MS : cfg::Net::REGISTER_RETRY_MS)) {
-        lastRegisterMs = millis();
-        registered = registerTaster();
-      }
-      if (millis() - lastVitalsMs >= cfg::Net::VITALS_INTERVAL_MS) {
-        lastVitalsMs = millis();
-        postVitals();
-      }
-      vTaskDelay(pdMS_TO_TICKS(20));
+      vTaskDelay(pdMS_TO_TICKS(5));
     }
+  }
+}
+
+// Anmeldung und Vitaldaten in eigenem Task: ein haengender Request hier darf
+// das Senden eines Tastendrucks nicht verzoegern.
+void housekeepingTask(void*) {
+  uint32_t lastVitalsMs = 0;
+  uint32_t lastRegisterMs = 0;
+  bool registered = false;
+  for (;;) {
+    if (reregisterNow) {
+      reregisterNow = false;
+      registered = false;
+      lastRegisterMs = 0;
+    }
+    if (millis() - lastRegisterMs >= (registered ? cfg::Net::REREGISTER_MS : cfg::Net::REGISTER_RETRY_MS)) {
+      lastRegisterMs = millis();
+      registered = registerTaster();
+    }
+    if (millis() - lastVitalsMs >= cfg::Net::VITALS_INTERVAL_MS) {
+      lastVitalsMs = millis();
+      postVitals();
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
@@ -490,6 +503,7 @@ void begin() {
   configTime(0, 0, cfg::Net::NTP_SERVER);
   xTaskCreate(netTask, "netlink", 8192, nullptr, 1, nullptr);
   xTaskCreate(displayTask, "display", 8192, nullptr, 1, nullptr);
+  xTaskCreate(housekeepingTask, "housekeeping", 8192, nullptr, 1, nullptr);
 }
 
 bool enqueueEvent(int64_t pressUs, bool abortRun) {
