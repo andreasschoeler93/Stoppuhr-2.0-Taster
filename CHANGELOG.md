@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.12.3 | 2026-10-29 | 0.8.0 | Tastendruck-Klick heller: 4000 Hz (Resonanz vieler Piezo-Summer), 120 ms, 50 % Tastverhältnis (Maximum). |
 | v0.12.2 | 2026-10-29 | 0.8.0 | Tastendruck-Klick: ein einzelner Ton mit 2700 Hz (Resonanz kleiner Piezos), 100 ms. Ersetzt die Tonfolge aus v0.12.1. |
 | v0.12.1 | 2026-10-29 | 0.8.0 | Lauterer Tastendruck-Klick: 120 ms lang, läuft über 2700/3400/4200 Hz, damit die Resonanz des Piezos getroffen wird. |
 | v0.12.0 | 2026-10-29 | 0.8.0 | WLAN-Name und -Kennwort kommen vom Pi (Einstellungen). Neue Daten werden vorgemerkt, bestätigt und bei Bedarf übernommen. Gespeicherte Daten bleiben beim Neustart erhalten, solange `secrets.h` gleich bleibt. |
