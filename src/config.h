@@ -37,7 +37,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 12
-#define FW_VERSION_PATCH 5
+#define FW_VERSION_PATCH 6
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -94,8 +94,8 @@ struct Layout {
   static constexpr int VITAL_SHIFT_DOWN = 6;
   static constexpr int WIFI_BARS_Y = Screen::H - 4;
   static constexpr int WIFI_LEFT_X = Screen::W - Screen::SAFE - 36;
-  static constexpr int BAT_W = 20;
-  static constexpr int BAT_H = 10;
+  static constexpr int BAT_W = 28;
+  static constexpr int BAT_H = 14;
   static constexpr int BAT_GAP_WIFI = 8;
   static constexpr int BAT_X = WIFI_LEFT_X - BAT_GAP_WIFI - BAT_W;
   static constexpr int BAT_Y = WIFI_BARS_Y - 2;
