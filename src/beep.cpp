@@ -6,8 +6,8 @@ namespace beep {
 namespace {
 
 constexpr uint8_t RES = 10;
-constexpr uint16_t FREQ_CLICK = 4000;
-constexpr uint16_t DUR_CLICK_MS = 120;
+constexpr uint16_t FREQ_CLICK = 2700;
+constexpr uint16_t DUR_CLICK_MS = 100;
 // Dumpfer Ton fuer Signale vom Server (Lauf gestartet / Bahn gestoppt)
 constexpr uint16_t FREQ_DULL = 1200;
 constexpr uint16_t DUR_DULL_MS = 110;
