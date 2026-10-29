@@ -65,9 +65,39 @@ struct Creds {
   char ntp[40];
 } creds;
 
+// Neue WLAN-Daten vom Pi: erst vormerken und bestaetigen. Erst wenn die Verbindung mit den
+// bisherigen Daten nicht mehr klappt (der Pi hat sein WLAN umgestellt), werden sie probiert
+// und bei Erfolg uebernommen.
+struct Pending {
+  bool valid = false;
+  char ssid[33] = "";
+  char pass[65] = "";
+  char ssid2[33] = "";
+  char pass2[65] = "";
+} pend;
+portMUX_TYPE pendMux = portMUX_INITIALIZER_UNLOCKED;
+volatile uint32_t ackVer = 0;  // zuletzt empfangene WLAN-Fassung, wird als "wv" gemeldet
+
+void jsonStr(const String& s, const char* key, char* out, size_t size);
+
+uint32_t fnv(uint32_t h, const char* s) {
+  for (; *s; ++s) h = (h ^ (uint8_t)*s) * 16777619u;
+  return (h ^ 0xFF) * 16777619u;
+}
+
 void loadCreds() {
   Preferences p;
   p.begin("cred", false);
+  // Ein Build mit secrets.h ueberschreibt die gespeicherten Daten nur, wenn sich secrets.h
+  // geaendert hat; sonst blieben vom Pi gesetzte WLAN-Daten nicht erhalten.
+  bool fresh = false;
+#if HAVE_SECRETS
+  uint32_t sig = 2166136261u;
+  const char* srcs[] = {cfg::Net::WIFI_SSID, cfg::Net::WIFI_PASS,  cfg::Net::WIFI2_SSID, cfg::Net::WIFI2_PASS,
+                        cfg::Net::PI_HOST,   cfg::Net::API_KEY,    cfg::Net::NTP_SERVER};
+  for (const char* s : srcs) sig = fnv(sig, s);
+  fresh = p.getUInt("sig", 0) != sig;
+#endif
   struct Item {
     const char* name;
     char* out;
@@ -83,17 +113,79 @@ void loadCreds() {
       {"ntp", creds.ntp, sizeof(creds.ntp), cfg::Net::NTP_SERVER},
   };
   for (auto& it : items) {
-#if HAVE_SECRETS
-    p.putString(it.name, it.compiled);
-    strlcpy(it.out, it.compiled, it.size);
-#else
-    if (p.isKey(it.name)) {
+    if (fresh) {
+      p.putString(it.name, it.compiled);
+      strlcpy(it.out, it.compiled, it.size);
+    } else if (p.isKey(it.name)) {
       p.getString(it.name, it.out, it.size);
     } else {
       strlcpy(it.out, it.compiled, it.size);
     }
-#endif
   }
+#if HAVE_SECRETS
+  if (fresh) {
+    p.putUInt("sig", sig);
+    p.putBool("pend", false);
+    p.putUInt("ackver", 0);
+  }
+#endif
+  ackVer = p.getUInt("ackver", 0);
+  if (p.getBool("pend", false)) {
+    pend.valid = true;
+    p.getString("nssid", pend.ssid, sizeof(pend.ssid));
+    p.getString("npass", pend.pass, sizeof(pend.pass));
+    p.getString("nssid2", pend.ssid2, sizeof(pend.ssid2));
+    p.getString("npass2", pend.pass2, sizeof(pend.pass2));
+  }
+  p.end();
+}
+
+// Neue WLAN-Daten aus der Anzeigeantwort des Pi vormerken und die Fassung bestaetigen.
+void storeWifiOffer(const String& body, uint32_t ver) {
+  Pending n;
+  jsonStr(body, "wifi_ssid1", n.ssid, sizeof(n.ssid));
+  jsonStr(body, "wifi_pass1", n.pass, sizeof(n.pass));
+  jsonStr(body, "wifi_ssid2", n.ssid2, sizeof(n.ssid2));
+  jsonStr(body, "wifi_pass2", n.pass2, sizeof(n.pass2));
+  if (!n.ssid[0] || !n.ssid2[0]) return;
+  n.valid = strcmp(n.ssid, creds.ssid) || strcmp(n.pass, creds.pass) ||
+            strcmp(n.ssid2, creds.ssid2) || strcmp(n.pass2, creds.pass2);
+  Preferences p;
+  p.begin("cred", false);
+  p.putBool("pend", n.valid);
+  if (n.valid) {
+    p.putString("nssid", n.ssid);
+    p.putString("npass", n.pass);
+    p.putString("nssid2", n.ssid2);
+    p.putString("npass2", n.pass2);
+  }
+  p.putUInt("ackver", ver);
+  p.end();
+  portENTER_CRITICAL(&pendMux);
+  pend = n;
+  portEXIT_CRITICAL(&pendMux);
+  ackVer = ver;
+}
+
+// Die vorgemerkten Daten haben funktioniert: dauerhaft uebernehmen.
+void promotePending() {
+  Pending n;
+  portENTER_CRITICAL(&pendMux);
+  n = pend;
+  pend.valid = false;
+  portEXIT_CRITICAL(&pendMux);
+  if (!n.valid) return;
+  strlcpy(creds.ssid, n.ssid, sizeof(creds.ssid));
+  strlcpy(creds.pass, n.pass, sizeof(creds.pass));
+  strlcpy(creds.ssid2, n.ssid2, sizeof(creds.ssid2));
+  strlcpy(creds.pass2, n.pass2, sizeof(creds.pass2));
+  Preferences p;
+  p.begin("cred", false);
+  p.putString("ssid", creds.ssid);
+  p.putString("pass", creds.pass);
+  p.putString("ssid2", creds.ssid2);
+  p.putString("pass2", creds.pass2);
+  p.putBool("pend", false);
   p.end();
 }
 
@@ -194,7 +286,7 @@ int postAbortRun(const Event& e) {
 void postVitals() {
   if (WiFi.status() != WL_CONNECTED) return;
   const measure::Data m = measure::data();
-  char body[320];
+  char body[360];
   char t[16], h[16];
   if (m.ahtOk && isfinite(m.temperature) && isfinite(m.humidity)) {
     snprintf(t, sizeof(t), "%.1f", m.temperature);
@@ -211,9 +303,10 @@ void postVitals() {
   if (nowEpoch != 0) snprintf(clock, sizeof(clock), ",\"clock_ms\":%llu", (unsigned long long)nowEpoch);
   snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
-           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu%s}",
+           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s}",
            deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
-           WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000), clock);
+           WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000),
+           (unsigned long)ackVer, clock);
 
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
@@ -366,6 +459,11 @@ uint8_t pollDisplay() {
   }
   r.recvMs = millis();
 
+  // Neue WLAN-Daten vom Pi (Fassung = Zeitstempel); wird ueber "wv" in den Vitaldaten bestaetigt
+  const char* wifiVerText = jsonValue(body, "wifi_ver");
+  uint32_t wifiVer = wifiVerText ? (uint32_t)strtoul(wifiVerText, nullptr, 10) : 0;
+  if (wifiVer != 0 && wifiVer != ackVer) storeWifiOffer(body, wifiVer);
+
   // Firmware-Angebot des Servers (nur wenn der Server dieses Update freigegeben hat)
   char offerVersion[16];
   jsonStr(body, "ota_version", offerVersion, sizeof(offerVersion));
@@ -445,15 +543,21 @@ bool wantBadWifi() {
   return want;
 }
 
-void connectProfile(bool bad) {
+void connectProfile(bool bad, bool usePending) {
+  Pending n;
+  portENTER_CRITICAL(&pendMux);
+  n = pend;
+  portEXIT_CRITICAL(&pendMux);
+  const bool np = usePending && n.valid;
   WiFi.disconnect();
-  if (bad) WiFi.begin(creds.ssid2, creds.pass2);
-  else WiFi.begin(creds.ssid, creds.pass);
+  if (bad) WiFi.begin(np ? n.ssid2 : creds.ssid2, np ? n.pass2 : creds.pass2);
+  else WiFi.begin(np ? n.ssid : creds.ssid, np ? n.pass : creds.pass);
 }
 
 void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
   bool onBadWifi = false;
+  bool tryPending = false;  // gerade mit den vorgemerkten WLAN-Daten verbinden
   for (;;) {
     bool wantBad = wantBadWifi();
     if (wantBad != onBadWifi) {
@@ -461,13 +565,23 @@ void netTask(void*) {
       onBadWifi = wantBad;
       reregisterNow = true;
       lastWifiTryMs = millis();
-      connectProfile(onBadWifi);
+      tryPending = false;
+      connectProfile(onBadWifi, false);
 #if DBG
       Serial.printf("[WIFI] wechsle ins %s-WLAN\n", onBadWifi ? "Bad" : "Koffer");
 #endif
     } else if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
       lastWifiTryMs = millis();
-      connectProfile(onBadWifi);
+      // Klappt die Verbindung nicht, abwechselnd die alten und die vorgemerkten Daten probieren
+      if (pend.valid) tryPending = !tryPending;
+      else tryPending = false;
+      connectProfile(onBadWifi, tryPending);
+    } else if (tryPending && WiFi.status() == WL_CONNECTED && millis() - lastWifiTryMs > 1500) {
+      tryPending = false;
+      promotePending();
+#if DBG
+      Serial.println("[WIFI] neue WLAN-Daten uebernommen");
+#endif
     }
     Event e;
     if (peek(e)) {
