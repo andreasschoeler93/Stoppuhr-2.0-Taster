@@ -221,9 +221,7 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
 
   c.setFont(&FreeSans9pt7b);
   c.setTextColor(cfg::Colors::GREY);
-  if (pendingLane == 0) {
-    printCentered("Taste: Starter", 230);
-  } else {
+  if (pendingLane != 0) {
     // Bereitschaft: Tausch wartet auf den ersten Tastendruck vor Ort
     char hint[24];
     if (pendingLane == netlink::RoleInfo::PENDING_STARTER) snprintf(hint, sizeof(hint), "Bereit: Start");
