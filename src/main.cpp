@@ -86,7 +86,15 @@ void loop() {
     modeStartedMs = millis() - cfg::Timing::SPLASH_MS;
   }
   int64_t pressUs = 0;
-  if (button::pressed(&pressUs)) {
+  // Zieleinlauf: jeden Druck sofort senden, auch bei schneller Folge (mehrere Schwimmer kurz nacheinander)
+  netlink::RoleInfo finishRole;
+  if (netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::FINISH) {
+    while (button::pressed(&pressUs)) {
+      netlink::sendTrigger(pressUs);
+      beep::click();
+    }
+    pendingButtonPress = false;
+  } else if (!pendingButtonPress && button::pressed(&pressUs)) {
     pendingPressUs = pressUs;
     pendingButtonPress = true;
     longPressSent = false;
