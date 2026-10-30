@@ -110,8 +110,12 @@ void renderBottomBar(uint16_t accent, char letter, const measure::Data& m) {
 
   gfx.fillRect(cfg::Screen::SAFE, rectTop,
                cfg::Screen::W - 2 * cfg::Screen::SAFE, rectH, accent);
+  const bool lowBattery = isfinite(m.vbat) && netlink::lowBatteryPercent() > 0
+    && m.vbatPercent <= netlink::lowBatteryPercent();
+  const bool batteryVisible = !lowBattery
+    || ((millis() / cfg::Timing::LOW_BATTERY_BLINK_MS) % 2 == 0);
   drawBatteryIcon(cfg::Layout::BAT_X, cfg::Layout::BAT_Y,
-                  m.vbatLevel, cfg::Colors::GREY, accent);
+                  m.vbatLevel, batteryVisible ? cfg::Colors::GREY : accent, accent);
   drawWifiBars(cfg::Layout::WIFI_LEFT_X, cfg::Layout::WIFI_BARS_Y, netlink::wifiLevel());
 
   char text[64];

@@ -214,7 +214,11 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
   char percent[8];
   if (batteryKnown) snprintf(percent, sizeof(percent), "%u%%", m.vbatPercent);
   else snprintf(percent, sizeof(percent), "--%%");
-  printCentered(percent, cfg::Layout::ASSIGN_PCT_BASELINE_Y);
+  const bool lowBattery = batteryKnown && netlink::lowBatteryPercent() > 0
+    && m.vbatPercent <= netlink::lowBatteryPercent();
+  const bool batteryVisible = !lowBattery
+    || ((millis() / cfg::Timing::LOW_BATTERY_BLINK_MS) % 2 == 0);
+  if (batteryVisible) printCentered(percent, cfg::Layout::ASSIGN_PCT_BASELINE_Y);
 
   c.setFont(&FreeSans24pt7b);
   const char letterText[] = {letter, '\0'};

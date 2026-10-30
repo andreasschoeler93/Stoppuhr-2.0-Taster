@@ -21,6 +21,9 @@ int wifiRssi();
 // Vom Server vergebener Buchstabe (A-J); '?' bis zur Anmeldung
 char letter();
 bool shutdownRequested();
+// Akkuwarnung vom Pi: Schwelle in Prozent (0 = aus) und Abschaltzeit in ms (0 = nie)
+uint8_t lowBatteryPercent();
+uint32_t lowBatteryShutdownMs();
 // true, solange ein Firmware-Update vom Pi laeuft; percent = Fortschritt 0..100
 bool otaActive(uint8_t& percent);
 

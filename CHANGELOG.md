@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.14.0 | 2026-10-30 | 0.15.0 | Akkuwarnung: ab einstellbarem Akkustand (Standard 10 %) blinkt die Akkuanzeige und der Taster piept alle 5 s, bleibt aber voll bedienbar. Nach einstellbarer Zeit unter der Schwelle (Standard 5 min) schaltet er sich ab. Beide Werte stellt man in der Pi-Oberfläche ein (Einstellungen; 0 = aus), der Taster holt sie über `/api/display`. |
 | v0.13.1 | 2026-10-30 | 0.13.2 | Zieleinlauf-Taster nimmt schnelle Druckfolgen an: Tastendrücke werden in einem Puffer (16) gesammelt und alle sofort gesendet, kein Druck geht mehr verloren. |
 | v0.13.0 | 2026-10-30 | 0.13.1 | Neue Rolle Zieleinlauf: gleiche Ansicht wie der Starter (Kopf „Ziel“, violetter Hintergrund). Zeile n zeigt die Zeit des n-ten Zieleinlauf-Drucks, die Zeilenzahl entspricht den Bahnen des Laufs. Zuordnungsbild „Bereit: Ziel“. |
 | v0.12.6 | 2026-10-29 | 0.8.0 | Akkusymbol in der unteren Leiste größer (28 × 14 statt 20 × 10 Pixel). |

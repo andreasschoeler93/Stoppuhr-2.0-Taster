@@ -112,6 +112,38 @@ void loop() {
     }
   }
   const measure::Data& m = measure::data();
+  static bool lowBatteryActive = false;
+  static uint32_t lowBatterySinceMs = 0;
+  static uint32_t lastLowBatteryBeepMs = 0;
+  static uint32_t lastLowBatteryBlinkMs = 0;
+  const uint32_t now = millis();
+  const bool lowBattery = isfinite(m.vbat) && netlink::lowBatteryPercent() > 0
+    && m.vbatPercent <= netlink::lowBatteryPercent();
+  if (lowBattery) {
+    if (!lowBatteryActive) {
+      lowBatteryActive = true;
+      lowBatterySinceMs = now;
+      lastLowBatteryBeepMs = now;
+      lastLowBatteryBlinkMs = now;
+      beep::lowBattery();
+      changed |= measure::CHANGED_BATTERY;
+    } else if (now - lastLowBatteryBeepMs >= cfg::Timing::LOW_BATTERY_BEEP_INTERVAL_MS) {
+      lastLowBatteryBeepMs = now;
+      beep::lowBattery();
+    }
+    const uint32_t shutdownAfterMs = netlink::lowBatteryShutdownMs();
+    if (shutdownAfterMs > 0 && now - lowBatterySinceMs >= shutdownAfterMs) {
+      digitalWrite(cfg::Pins::HOLD, LOW);
+      return;
+    }
+    if (now - lastLowBatteryBlinkMs >= cfg::Timing::LOW_BATTERY_BLINK_MS) {
+      lastLowBatteryBlinkMs = now;
+      changed |= measure::CHANGED_BATTERY;
+    }
+  } else if (isfinite(m.vbat) && lowBatteryActive) {
+    lowBatteryActive = false;
+    changed |= measure::CHANGED_BATTERY;
+  }
 
   // Buchstabe vom Server uebernehmen und bei Aenderung neu zeichnen
   if (netlink::letter() != assignLetter) {

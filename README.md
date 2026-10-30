@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.13.1)
+# Taster – Firmware (v0.14.0)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -12,6 +12,7 @@ Die verbindliche Pinbelegung steht in [`docs/Programmier_Informationen`](docs/Pr
 
 Die Akkuspannung wird aus acht gemittelten ADC-Messungen mit dem Faktor `2.382` berechnet, der Prozentwert ist eine Schätzung aus der Zellspannung.
 Der Display-Bildspeicher belegt rund 131 KiB RAM; scheitert das Anlegen, meldet die Firmware `[GFX] ERROR` und überspringt das Zeichnen.
+Warnschwelle (Standard 10 %) und Abschaltzeit (Standard 5 min) stellt man in der Pi-Oberfläche unter Einstellungen ein; der Taster holt sie über `/api/display`. Pieptonabstand und Blinkdauer stehen in `src/config.h`.
 
 ## Bauen und flashen
 
@@ -92,6 +93,9 @@ Ohne Rolle zeigt der Taster die Zuordnung (Akku-Prozent und Buchstabe, untere Le
 Beim Stoppen zeigt die Bahn die eigene Zeit sofort in Gelb und hält sie, bis der Pi den Stopp bestätigt hat.
 Die laufende Uhr rechnet lokal weiter und überträgt nur das Zeitfeld. Namen und Disziplinen unterstützen deutsche Umlaute (UTF-8 vom Pi).
 „Wettkampf beenden“ im Pi sendet einen befristeten Abschaltbefehl; der Taster trennt dann die Selbsthaltung (GPIO44) und schaltet sich aus.
+
+Bei einem Akkustand unterhalb der Warnschwelle (Standard 10 %, einstellbar, 0 = aus) blinkt die Prozentanzeige bzw. das Akkusymbol und der Taster piept regelmäßig weiter, ohne die Tastenfunktion einzuschränken.
+Bleibt der Akku unter der Schwelle, schaltet sich der Taster nach der eingestellten Zeit (Standard 5 min, 0 = nie) über die Selbsthaltung aus.
 
 ### Zieleinlauf (ab v0.13.0)
 

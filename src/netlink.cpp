@@ -33,6 +33,9 @@ String deviceMac;
 String deviceName;
 volatile char tasterLetter = '?';
 volatile bool shutdownRequestedFlag = false;
+// Akkuwarnung, vom Pi einstellbar (Startwerte aus config.h)
+volatile uint8_t lowBatteryPct = cfg::Timing::LOW_BATTERY_PERCENT;
+volatile uint16_t lowBatteryMin = cfg::Timing::LOW_BATTERY_SHUTDOWN_MS / 60000UL;
 RoleInfo roleState;
 bool roleValid = false;
 portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
@@ -410,6 +413,8 @@ uint8_t pollDisplay() {
   forgetIp(code);
   if (code != 200) return roleState.role;
   if (jsonBool(body, "shutdown")) shutdownRequestedFlag = true;
+  lowBatteryPct = (uint8_t)constrain(jsonInt(body, "low_battery_pct", lowBatteryPct), 0, 100);
+  lowBatteryMin = (uint16_t)constrain(jsonInt(body, "low_battery_min", lowBatteryMin), 0, 1440);
 
   RoleInfo r;
   char roleText[12];
@@ -812,6 +817,8 @@ int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
 
 char letter() { return tasterLetter; }
 bool shutdownRequested() { return shutdownRequestedFlag; }
+uint8_t lowBatteryPercent() { return lowBatteryPct; }
+uint32_t lowBatteryShutdownMs() { return (uint32_t)lowBatteryMin * 60000UL; }
 
 bool otaActive(uint8_t& percent) {
   percent = otaPercent;

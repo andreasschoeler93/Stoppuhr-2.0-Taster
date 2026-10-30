@@ -11,6 +11,8 @@ constexpr uint16_t DUR_CLICK_MS = 100;
 // Dumpfer Ton fuer Signale vom Server (Lauf gestartet / Bahn gestoppt)
 constexpr uint16_t FREQ_DULL = 1200;
 constexpr uint16_t DUR_DULL_MS = 110;
+constexpr uint16_t FREQ_LOW_BATTERY = 1800;
+constexpr uint16_t DUR_LOW_BATTERY_MS = 180;
 // Lauf abgebrochen: drei lange Pieptoene mit Pause
 constexpr uint16_t FREQ_ABORT = 2400;
 constexpr uint16_t DUR_ABORT_MS = 450;
@@ -44,6 +46,8 @@ void begin() {
 void click() { play(FREQ_CLICK, DUR_CLICK_MS); }
 
 void dull() { play(FREQ_DULL, DUR_DULL_MS); }
+
+void lowBattery() { play(FREQ_LOW_BATTERY, DUR_LOW_BATTERY_MS); }
 
 void abortRun() {
   abortLeft = 3;

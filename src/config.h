@@ -36,8 +36,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 13
-#define FW_VERSION_PATCH 1
+#define FW_VERSION_MINOR 14
+#define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -130,6 +130,13 @@ struct Timing {
   static constexpr uint32_t VBAT_POLL_MS = 5000;
   static constexpr uint32_t VBAT_SETTLE_MS = 5;
   static constexpr uint8_t VBAT_SAMPLE_COUNT = 8;
+  // Akkuwarnung: bei Erreichen oder Unterschreiten blinken Anzeige und Akkusymbol.
+  static constexpr uint8_t LOW_BATTERY_PERCENT = 10;
+  // Abschaltung nach dieser Zeit unterhalb der Warnschwelle.
+  static constexpr uint32_t LOW_BATTERY_SHUTDOWN_MS = 5UL * 60UL * 1000UL;
+  static constexpr uint32_t LOW_BATTERY_BEEP_INTERVAL_MS = 5000;
+  // Dauer einer sichtbaren bzw. ausgeblendeten Blinkphase.
+  static constexpr uint32_t LOW_BATTERY_BLINK_MS = 500;
   // Laufende Uhr in den Rollenansichten: nur das Zeitfeld wird so oft neu uebertragen
   static constexpr uint32_t ROLE_CLOCK_MS = 60;
 };
