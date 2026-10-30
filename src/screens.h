@@ -14,6 +14,8 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane = 0
 
 // Rollenansicht "Start" bzw. "Bahn N" mit Zeit, Name, Disziplin und letzter Zeit.
 void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m);
+// Funktest-Ansicht (Rolle RANGE): Signalstaerke in dBm mit Ampelfarbe
+void drawRange(const netlink::RoleInfo& ri, char letter, const measure::Data& m);
 // Aktualisiert nur das Zeitfeld (laufende Uhr), ohne das ganze Bild zu uebertragen.
 void drawRoleClock(const netlink::RoleInfo& ri);
 

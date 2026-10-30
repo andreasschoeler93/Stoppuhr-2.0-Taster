@@ -163,6 +163,45 @@ void drawLaneList(const netlink::RoleInfo& ri, uint16_t bg) {
 
 }  // namespace
 
+// Funktest: Signalstaerke gross, Hintergrund gruen/gelb/rot
+void drawRange(const netlink::RoleInfo& ri, char letter, const measure::Data& m) {
+  GFXcanvas16& c = display::canvas();
+  const int rssi = netlink::wifiRssi();
+  const bool online = netlink::wifiLevel() > 0;
+  uint16_t bg = cfg::rgb565(0, 140, 0);
+  const char* verdict = "gut";
+  if (!online || rssi <= ri.rangeCrit) {
+    bg = cfg::rgb565(180, 0, 0);
+    verdict = online ? "kritisch" : "kein WLAN";
+  } else if (rssi <= ri.rangeWarn) {
+    bg = cfg::rgb565(200, 140, 0);
+    verdict = "schwach";
+  }
+  c.fillScreen(bg);
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans12pt7b);
+  c.setCursor(cfg::Screen::SAFE, cfg::Layout::ROLE_HEADER_Y);
+  c.print("Funktest");
+
+  char text[16];
+  if (online) snprintf(text, sizeof(text), "%d", rssi);
+  else snprintf(text, sizeof(text), "--");
+  c.setFont(&FreeSans24pt7b);
+  printCentered(text, 130);
+  c.setFont(&FreeSans12pt7b);
+  printCentered("dBm", 160);
+  printCentered(verdict, 195);
+
+  // Balken: -100 dBm (leer) bis -40 dBm (voll)
+  const int x = cfg::Screen::SAFE + 4;
+  const int w = cfg::Screen::W - 2 * x;
+  const int fill = online ? constrain((rssi + 100) * w / 60, 0, w) : 0;
+  c.drawRect(x, 210, w, 10, cfg::Colors::WHITE);
+  c.fillRect(x, 210, fill, 10, cfg::Colors::WHITE);
+
+  display::renderBottomBar(bg, letter, m);
+}
+
 void drawSplash(char letter, const measure::Data& m) {
   if (!display::ready()) return;
 
@@ -255,6 +294,11 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
 
 void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) {
   if (!display::ready()) return;
+
+  if (ri.role == netlink::RoleInfo::RANGE) {
+    drawRange(ri, letter, m);
+    return;
+  }
 
   GFXcanvas16& c = display::canvas();
   const uint16_t bg = roleBg(ri);

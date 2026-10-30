@@ -29,9 +29,12 @@ bool otaActive(uint8_t& percent);
 
 // Anzeigedaten der Rolle (Starter/Bahn), vom Server per GET /api/display geholt.
 struct RoleInfo {
-  enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2, FINISH = 3 };
+  enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2, FINISH = 3, RANGE = 4 };
   enum State : uint8_t { READY = 0, RUNNING = 1, STOPPED = 2, INACTIVE = 3 };
   uint8_t role = NONE;
+  // Funktest (Rolle RANGE): Signalstaerke in dBm, ab der gelb bzw. rot gewarnt wird
+  int8_t rangeWarn = -75;
+  int8_t rangeCrit = -85;
   // Bereitschaft: Tausch vorgemerkt, 0 = keiner, 1..N = Bahn, PENDING_STARTER = Starter, PENDING_FINISH = Zieleinlauf
   static constexpr uint8_t PENDING_STARTER = 255;
   static constexpr uint8_t PENDING_FINISH = 254;

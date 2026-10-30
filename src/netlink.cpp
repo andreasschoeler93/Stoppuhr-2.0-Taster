@@ -422,7 +422,10 @@ uint8_t pollDisplay() {
   r.role = !strcmp(roleText, "starter") ? RoleInfo::STARTER
          : !strcmp(roleText, "finish")  ? RoleInfo::FINISH
          : !strcmp(roleText, "lane")    ? RoleInfo::LANE
+         : !strcmp(roleText, "range")   ? RoleInfo::RANGE
                                         : RoleInfo::NONE;
+  r.rangeWarn = (int8_t)constrain(jsonInt(body, "rssi_warn", -75), -127, 0);
+  r.rangeCrit = (int8_t)constrain(jsonInt(body, "rssi_crit", -85), -127, 0);
   char stateText[12];
   jsonStr(body, "state", stateText, sizeof(stateText));
   r.state = !strcmp(stateText, "running")  ? RoleInfo::RUNNING

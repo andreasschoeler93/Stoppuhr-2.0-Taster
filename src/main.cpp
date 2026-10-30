@@ -88,7 +88,11 @@ void loop() {
   int64_t pressUs = 0;
   // Zieleinlauf: jeden Druck sofort senden, auch bei schneller Folge (mehrere Schwimmer kurz nacheinander)
   netlink::RoleInfo finishRole;
-  if (netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::FINISH) {
+  if (netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::RANGE) {
+    // Funktest: Tastendruecke werden verworfen
+    while (button::pressed(&pressUs)) {}
+    pendingButtonPress = false;
+  } else if (netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::FINISH) {
     while (button::pressed(&pressUs)) {
       netlink::sendTrigger(pressUs);
       beep::click();
@@ -242,7 +246,23 @@ void loop() {
     }
   } else if (haveRole) {
     // Rollenansicht: Vollbild bei Aenderung, sonst nur das Zeitfeld
-    if (uiMode != UiMode::ROLE || ri.seq != roleSeq || localChanged || (changed & measure::CHANGED_BATTERY)) {
+    if (ri.role == netlink::RoleInfo::RANGE) {
+      // Funktest: Signalstaerke regelmaessig neu zeichnen, bei kritischem Signal piepen
+      static uint32_t lastRangeDrawMs = 0;
+      static uint32_t lastRangeBeepMs = 0;
+      if (uiMode != UiMode::ROLE || ri.seq != roleSeq || millis() - lastRangeDrawMs >= 500) {
+        uiMode = UiMode::ROLE;
+        roleSeq = ri.seq;
+        lastRangeDrawMs = millis();
+        screens::drawRole(ri, assignLetter, m);
+      }
+      if (netlink::wifiLevel() == 0 || netlink::wifiRssi() <= ri.rangeCrit) {
+        if (millis() - lastRangeBeepMs >= 1000) {
+          lastRangeBeepMs = millis();
+          beep::lowBattery();
+        }
+      }
+    } else if (uiMode != UiMode::ROLE || ri.seq != roleSeq || localChanged || (changed & measure::CHANGED_BATTERY)) {
       uiMode = UiMode::ROLE;
       roleSeq = ri.seq;
       screens::drawRole(ri, assignLetter, m);

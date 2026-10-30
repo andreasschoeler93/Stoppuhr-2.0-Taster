@@ -36,7 +36,7 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 14
+#define FW_VERSION_MINOR 15
 #define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
