@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.12.6)
+# Taster – Firmware (v0.13.0)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -92,6 +92,10 @@ Ohne Rolle zeigt der Taster die Zuordnung (Akku-Prozent und Buchstabe, untere Le
 Beim Stoppen zeigt die Bahn die eigene Zeit sofort in Gelb und hält sie, bis der Pi den Stopp bestätigt hat.
 Die laufende Uhr rechnet lokal weiter und überträgt nur das Zeitfeld. Namen und Disziplinen unterstützen deutsche Umlaute (UTF-8 vom Pi).
 „Wettkampf beenden“ im Pi sendet einen befristeten Abschaltbefehl; der Taster trennt dann die Selbsthaltung (GPIO44) und schaltet sich aus.
+
+### Zieleinlauf (ab v0.13.0)
+
+Der Zieleinlauf-Taster zeigt dieselbe Liste wie der Starter (Kopf „Ziel“, violett). Er stoppt keine Bahnen: Zeile n zeigt die Zeit des n-ten Drucks, es gibt so viele Zeilen wie Bahnen im Lauf. Bahnen ordnet der Pi in der Oberfläche zu.
 
 ### Starter: Abbruch
 

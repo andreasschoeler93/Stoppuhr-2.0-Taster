@@ -26,11 +26,12 @@ bool otaActive(uint8_t& percent);
 
 // Anzeigedaten der Rolle (Starter/Bahn), vom Server per GET /api/display geholt.
 struct RoleInfo {
-  enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2 };
+  enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2, FINISH = 3 };
   enum State : uint8_t { READY = 0, RUNNING = 1, STOPPED = 2, INACTIVE = 3 };
   uint8_t role = NONE;
-  // Bereitschaft: Tausch vorgemerkt, 0 = keiner, 1..N = Bahn, PENDING_STARTER = Starter
+  // Bereitschaft: Tausch vorgemerkt, 0 = keiner, 1..N = Bahn, PENDING_STARTER = Starter, PENDING_FINISH = Zieleinlauf
   static constexpr uint8_t PENDING_STARTER = 255;
+  static constexpr uint8_t PENDING_FINISH = 254;
   uint8_t pendingLane = 0;
   uint8_t state = READY;
   uint8_t lane = 0;

@@ -415,6 +415,7 @@ uint8_t pollDisplay() {
   char roleText[12];
   jsonStr(body, "role", roleText, sizeof(roleText));
   r.role = !strcmp(roleText, "starter") ? RoleInfo::STARTER
+         : !strcmp(roleText, "finish")  ? RoleInfo::FINISH
          : !strcmp(roleText, "lane")    ? RoleInfo::LANE
                                         : RoleInfo::NONE;
   char stateText[12];
@@ -427,6 +428,7 @@ uint8_t pollDisplay() {
   char pendingText[12];
   jsonStr(body, "pending_lane", pendingText, sizeof(pendingText));
   r.pendingLane = !strcmp(pendingText, "starter") ? RoleInfo::PENDING_STARTER
+                : !strcmp(pendingText, "ziel")    ? RoleInfo::PENDING_FINISH
                                                   : (uint8_t)atoi(pendingText);
   r.run = (uint16_t)jsonInt(body, "run", 0);
   r.attempt = (uint16_t)jsonInt(body, "attempt", 1);
@@ -438,7 +440,7 @@ uint8_t pollDisplay() {
   jsonStr(body, "name", r.name, sizeof(r.name));
   jsonStr(body, "discipline", r.discipline, sizeof(r.discipline));
   jsonStr(body, "last_name", r.lastName, sizeof(r.lastName));
-  if (r.role == RoleInfo::STARTER) {
+  if (r.role == RoleInfo::STARTER || r.role == RoleInfo::FINISH) {
     const char* v = jsonValue(body, "lanes");
     if (v && *v == '"') {
       ++v;

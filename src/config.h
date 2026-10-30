@@ -36,8 +36,8 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 12
-#define FW_VERSION_PATCH 6
+#define FW_VERSION_MINOR 13
+#define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -83,6 +83,7 @@ struct Colors {
   static constexpr uint16_t WHITE = 0xFFFF;
   // Rollenansichten
   static constexpr uint16_t ROLE_START = rgb565(170, 30, 30);
+  static constexpr uint16_t ROLE_FINISH = rgb565(120, 40, 160);
   static constexpr uint16_t ROLE_READY = rgb565(20, 60, 180);
   static constexpr uint16_t ROLE_RUNNING = rgb565(0, 130, 0);
   static constexpr uint16_t ROLE_STOPPED = rgb565(70, 70, 85);

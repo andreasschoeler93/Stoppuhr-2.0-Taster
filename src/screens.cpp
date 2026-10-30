@@ -28,6 +28,7 @@ void printCentered(const char* text, int baselineY) {
 
 uint16_t roleBg(const netlink::RoleInfo& ri) {
   if (ri.role == netlink::RoleInfo::STARTER) return cfg::Colors::ROLE_START;
+  if (ri.role == netlink::RoleInfo::FINISH) return cfg::Colors::ROLE_FINISH;
   switch (ri.state) {
     case netlink::RoleInfo::RUNNING: return cfg::Colors::ROLE_RUNNING;
     case netlink::RoleInfo::STOPPED:
@@ -225,6 +226,7 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
     // Bereitschaft: Tausch wartet auf den ersten Tastendruck vor Ort
     char hint[24];
     if (pendingLane == netlink::RoleInfo::PENDING_STARTER) snprintf(hint, sizeof(hint), "Bereit: Start");
+    else if (pendingLane == netlink::RoleInfo::PENDING_FINISH) snprintf(hint, sizeof(hint), "Bereit: Ziel");
     else snprintf(hint, sizeof(hint), "Bereit: Bahn %u", pendingLane);
     c.setTextColor(cfg::Colors::WHITE);
     printCentered(hint, 204);
@@ -258,6 +260,7 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
   // Kopfzeile: Rolle links, Lauf rechts
   char head[12];
   if (ri.role == netlink::RoleInfo::STARTER) snprintf(head, sizeof(head), "Start");
+  else if (ri.role == netlink::RoleInfo::FINISH) snprintf(head, sizeof(head), "Ziel");
   else snprintf(head, sizeof(head), "Bahn %u", ri.lane);
   c.setFont(&FreeSans12pt7b);
   c.setCursor(cfg::Screen::SAFE, cfg::Layout::ROLE_HEADER_Y);
@@ -271,7 +274,7 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
   c.setCursor(cfg::Screen::W - cfg::Screen::SAFE - (int)w, cfg::Layout::ROLE_HEADER_Y);
   c.print(run);
 
-  if (ri.role == netlink::RoleInfo::STARTER) {
+  if (ri.role == netlink::RoleInfo::STARTER || ri.role == netlink::RoleInfo::FINISH) {
     drawLaneList(ri, bg);
     display::renderBottomBar(bg, letter, m);
     return;
@@ -313,7 +316,7 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
 
 void drawRoleClock(const netlink::RoleInfo& ri) {
   if (!display::ready()) return;
-  if (ri.role == netlink::RoleInfo::STARTER) {
+  if (ri.role == netlink::RoleInfo::STARTER || ri.role == netlink::RoleInfo::FINISH) {
     drawLaneList(ri, roleBg(ri));
     display::flushRows(cfg::Layout::STARTER_LIST_TOP,
                        cfg::Layout::STARTER_LIST_BOTTOM - cfg::Layout::STARTER_LIST_TOP);
