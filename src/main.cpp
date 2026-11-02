@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include <esp_timer.h>
+#include <esp_system.h>
 
 #include "beep.h"
 #include "button.h"
@@ -48,6 +49,8 @@ void setup() {
   delay(50);
 #if DBG
   Serial.println("Stoppuhr 2.0 " FW_VERSION);
+  Serial.printf("Reset-Grund: %d (1=Power-on 3=SW 4=Panic 5=IntWDT 6=TaskWDT 7=WDT 9=Brownout)\n",
+                (int)esp_reset_reason());
 #endif
 
   button::begin();

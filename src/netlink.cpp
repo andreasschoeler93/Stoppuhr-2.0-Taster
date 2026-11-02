@@ -564,8 +564,16 @@ void connectProfile(bool bad, bool usePending) {
   else WiFi.begin(np ? n.ssid : creds.ssid, np ? n.pass : creds.pass);
 }
 
+// Ohne Empfang wird der Abstand zwischen Verbindungsversuchen laenger (5 s bis 20 s),
+// damit Dauer-Scans nicht Strom und Heap belasten.
+uint32_t wifiRetryDelay(uint8_t failed) {
+  uint32_t d = cfg::Net::WIFI_RETRY_MS * (1u + (failed > 3 ? 3 : failed));
+  return d > 20000 ? 20000 : d;
+}
+
 void netTask(void*) {
   uint32_t lastWifiTryMs = 0;
+  uint8_t failedTries = 0;
   bool onBadWifi = false;
   bool tryPending = false;  // gerade mit den vorgemerkten WLAN-Daten verbinden
   for (;;) {
@@ -576,22 +584,27 @@ void netTask(void*) {
       reregisterNow = true;
       lastWifiTryMs = millis();
       tryPending = false;
+      failedTries = 0;
       connectProfile(onBadWifi, false);
 #if DBG
       Serial.printf("[WIFI] wechsle ins %s-WLAN\n", onBadWifi ? "Bad" : "Koffer");
 #endif
-    } else if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
+    } else if (WiFi.status() == WL_CONNECTED) {
+      failedTries = 0;
+      if (tryPending && millis() - lastWifiTryMs > 1500) {
+        tryPending = false;
+        promotePending();
+#if DBG
+        Serial.println("[WIFI] neue WLAN-Daten uebernommen");
+#endif
+      }
+    } else if (millis() - lastWifiTryMs >= wifiRetryDelay(failedTries)) {
       lastWifiTryMs = millis();
+      if (failedTries < 255) failedTries++;
       // Klappt die Verbindung nicht, abwechselnd die alten und die vorgemerkten Daten probieren
       if (pend.valid) tryPending = !tryPending;
       else tryPending = false;
       connectProfile(onBadWifi, tryPending);
-    } else if (tryPending && WiFi.status() == WL_CONNECTED && millis() - lastWifiTryMs > 1500) {
-      tryPending = false;
-      promotePending();
-#if DBG
-      Serial.println("[WIFI] neue WLAN-Daten uebernommen");
-#endif
     }
     Event e;
     if (peek(e)) {
