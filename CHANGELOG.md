@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.16.0 | 2026-11-03 | 0.15.0 | WLAN-Neuverbindung bei Trennung alle 5 s (jeder Versuch wird seriell protokolliert). Akkuwarnung erst nach drei aufeinanderfolgenden Messungen unter der Schwelle; Entwarnung nach drei Messungen mindestens 2 Prozentpunkte darüber. Die Abschaltzeit zählt nur bei Messungen unter der Schwelle und wird bei Erholung zurückgesetzt. |
 | v0.15.0 | 2026-10-30 | 0.16.0 | Funktest: Der Pi kann einen Taster in die Rolle „range“ schalten. Das Display zeigt dann die WLAN-Signalstärke (dBm) mit Ampelfarbe und Balken, bei kritischem Signal oder ohne WLAN piept der Taster einmal pro Sekunde. Tastendrücke werden verworfen. |
 | v0.14.0 | 2026-10-30 | 0.15.0 | Akkuwarnung: ab einstellbarem Akkustand (Standard 10 %) blinkt die Akkuanzeige und der Taster piept alle 5 s, bleibt aber voll bedienbar. Nach einstellbarer Zeit unter der Schwelle (Standard 5 min) schaltet er sich ab. Beide Werte stellt man in der Pi-Oberfläche ein (Einstellungen; 0 = aus), der Taster holt sie über `/api/display`. |
 | v0.13.1 | 2026-10-30 | 0.13.2 | Zieleinlauf-Taster nimmt schnelle Druckfolgen an: Tastendrücke werden in einem Puffer (16) gesammelt und alle sofort gesendet, kein Druck geht mehr verloren. |

@@ -13,6 +13,17 @@ Adafruit_AHTX0 aht;
 uint8_t ahtFail = 0;
 uint32_t lastAhtMs = 0;
 uint32_t lastVbatMs = 0;
+uint8_t lowBatterySamples = 0;
+uint8_t batteryRecoverySamples = 0;
+uint8_t batteryWarningPercent = 0;
+bool batteryWarningConfigured = false;
+bool batteryWarningOn = false;
+bool batteryAtOrBelowThreshold = false;
+bool batterySampleProcessed = false;
+uint32_t lastBatteryWarningSampleId = 0;
+uint32_t lowBatteryCandidateSinceMs = 0;
+uint32_t lowBatteryDurationMs = 0;
+uint32_t lastLowBatterySampleMs = 0;
 
 struct BatteryReading {
   uint32_t rawAverage;
@@ -106,6 +117,7 @@ uint8_t pollBattery() {
   g.vbatCalc = reading.batteryVoltage;
   g.rawAverage = reading.rawAverage;
   g.adcVoltage = reading.adcVoltage;
+  ++g.vbatSampleId;
 
 #if DBG
   Serial.printf(
@@ -214,6 +226,92 @@ void begin() {
 
 uint8_t update() {
   return pollAht() | pollBattery();
+}
+
+uint8_t updateBatteryWarning(uint8_t warningPercent) {
+  const uint32_t now = millis();
+  if (!batteryWarningConfigured || warningPercent != batteryWarningPercent) {
+    const bool wasActive = batteryWarningOn;
+    batteryWarningConfigured = true;
+    batteryWarningPercent = warningPercent;
+    batteryWarningOn = false;
+    batteryAtOrBelowThreshold = false;
+    lowBatterySamples = 0;
+    batteryRecoverySamples = 0;
+    lowBatteryDurationMs = 0;
+    batterySampleProcessed = true;
+    lastBatteryWarningSampleId = g.vbatSampleId;
+    return wasActive ? CHANGED_BATTERY : CHANGED_NONE;
+  }
+
+  if (batterySampleProcessed && g.vbatSampleId == lastBatteryWarningSampleId) return CHANGED_NONE;
+  batterySampleProcessed = true;
+  lastBatteryWarningSampleId = g.vbatSampleId;
+
+  if (warningPercent == 0) return CHANGED_NONE;
+  if (!isfinite(g.vbat)) {
+    lowBatterySamples = 0;
+    batteryRecoverySamples = 0;
+    batteryAtOrBelowThreshold = false;
+    lowBatteryDurationMs = 0;
+    lastLowBatterySampleMs = now;
+    return CHANGED_NONE;
+  }
+
+  const bool wasAtOrBelowThreshold = batteryAtOrBelowThreshold;
+  batteryAtOrBelowThreshold = g.vbatPercent <= warningPercent;
+
+  if (!batteryWarningOn) {
+    if (!batteryAtOrBelowThreshold) {
+      lowBatterySamples = 0;
+      return CHANGED_NONE;
+    }
+
+    if (lowBatterySamples == 0) lowBatteryCandidateSinceMs = now;
+    if (++lowBatterySamples < cfg::Timing::LOW_BATTERY_CONFIRM_SAMPLES) return CHANGED_NONE;
+
+    batteryWarningOn = true;
+    batteryRecoverySamples = 0;
+    lowBatteryDurationMs = now - lowBatteryCandidateSinceMs;
+    lastLowBatterySampleMs = now;
+    return CHANGED_BATTERY;
+  }
+
+  if (batteryAtOrBelowThreshold) {
+    batteryRecoverySamples = 0;
+    if (wasAtOrBelowThreshold) {
+      lowBatteryDurationMs += now - lastLowBatterySampleMs;
+    } else {
+      lowBatteryDurationMs = 0;
+    }
+    lastLowBatterySampleMs = now;
+    return CHANGED_NONE;
+  }
+
+  lowBatteryDurationMs = 0;
+  lastLowBatterySampleMs = now;
+  const uint16_t recoveryPercent = (uint16_t)warningPercent
+    + cfg::Timing::LOW_BATTERY_RECOVERY_MARGIN_PERCENT;
+  if (g.vbatPercent >= recoveryPercent) {
+    if (++batteryRecoverySamples >= cfg::Timing::LOW_BATTERY_RECOVERY_SAMPLES) {
+      batteryWarningOn = false;
+      batteryRecoverySamples = 0;
+      lowBatterySamples = 0;
+      return CHANGED_BATTERY;
+    }
+  } else {
+    batteryRecoverySamples = 0;
+  }
+  return CHANGED_NONE;
+}
+
+bool batteryWarningActive() {
+  return batteryWarningOn;
+}
+
+bool batteryShutdownDue(uint32_t shutdownAfterMs) {
+  if (!batteryWarningOn || !batteryAtOrBelowThreshold || shutdownAfterMs == 0) return false;
+  return lowBatteryDurationMs + millis() - lastLowBatterySampleMs >= shutdownAfterMs;
 }
 
 const Data& data() {

@@ -105,6 +105,7 @@ void loop() {
   }
 
   uint8_t changed = measure::update();
+  changed |= measure::updateBatteryWarning(netlink::lowBatteryPercent());
   static uint8_t lastWifiLevel = 0xFF;
   static uint32_t lastWifiCheckMs = 0;
   if (millis() - lastWifiCheckMs >= 2000) {
@@ -116,17 +117,13 @@ void loop() {
     }
   }
   const measure::Data& m = measure::data();
-  static bool lowBatteryActive = false;
-  static uint32_t lowBatterySinceMs = 0;
+  static bool lowBatteryWasActive = false;
   static uint32_t lastLowBatteryBeepMs = 0;
   static uint32_t lastLowBatteryBlinkMs = 0;
   const uint32_t now = millis();
-  const bool lowBattery = isfinite(m.vbat) && netlink::lowBatteryPercent() > 0
-    && m.vbatPercent <= netlink::lowBatteryPercent();
+  const bool lowBattery = measure::batteryWarningActive();
   if (lowBattery) {
-    if (!lowBatteryActive) {
-      lowBatteryActive = true;
-      lowBatterySinceMs = now;
+    if (!lowBatteryWasActive) {
       lastLowBatteryBeepMs = now;
       lastLowBatteryBlinkMs = now;
       beep::lowBattery();
@@ -135,8 +132,7 @@ void loop() {
       lastLowBatteryBeepMs = now;
       beep::lowBattery();
     }
-    const uint32_t shutdownAfterMs = netlink::lowBatteryShutdownMs();
-    if (shutdownAfterMs > 0 && now - lowBatterySinceMs >= shutdownAfterMs) {
+    if (measure::batteryShutdownDue(netlink::lowBatteryShutdownMs())) {
       digitalWrite(cfg::Pins::HOLD, LOW);
       return;
     }
@@ -144,10 +140,8 @@ void loop() {
       lastLowBatteryBlinkMs = now;
       changed |= measure::CHANGED_BATTERY;
     }
-  } else if (isfinite(m.vbat) && lowBatteryActive) {
-    lowBatteryActive = false;
-    changed |= measure::CHANGED_BATTERY;
   }
+  lowBatteryWasActive = lowBattery;
 
   // Buchstabe vom Server uebernehmen und bei Aenderung neu zeichnen
   if (netlink::letter() != assignLetter) {

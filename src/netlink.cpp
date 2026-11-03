@@ -582,6 +582,10 @@ void netTask(void*) {
 #endif
     } else if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTryMs >= cfg::Net::WIFI_RETRY_MS) {
       lastWifiTryMs = millis();
+#if DBG
+      Serial.printf("[WIFI] Verbindung getrennt; neuer Verbindungsversuch (Intervall %lu ms)\n",
+                    (unsigned long)cfg::Net::WIFI_RETRY_MS);
+#endif
       // Klappt die Verbindung nicht, abwechselnd die alten und die vorgemerkten Daten probieren
       if (pend.valid) tryPending = !tryPending;
       else tryPending = false;
@@ -743,8 +747,8 @@ void begin() {
                   info.wifi_sta_disconnected.reason);
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) {
-    Serial.printf("[WIFI] verbunden: SSID=%s IP=%s RSSI=%d Kanal=%d\n", WiFi.SSID().c_str(),
-                  WiFi.localIP().toString().c_str(), WiFi.RSSI(), WiFi.channel());
+    Serial.printf("[WIFI] verbunden: SSID=%s IP=%s RSSI=%d Kanal=%ld\n", WiFi.SSID().c_str(),
+                  WiFi.localIP().toString().c_str(), WiFi.RSSI(), (long)WiFi.channel());
   }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   Serial.printf("[WIFI] suche SSID=\"%s\" (%u Zeichen Passwort)\n", creds.ssid,
                 (unsigned)strlen(creds.pass));

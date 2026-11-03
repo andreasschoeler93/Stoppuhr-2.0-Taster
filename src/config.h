@@ -36,7 +36,7 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 15
+#define FW_VERSION_MINOR 16
 #define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
@@ -130,9 +130,12 @@ struct Timing {
   static constexpr uint32_t VBAT_POLL_MS = 5000;
   static constexpr uint32_t VBAT_SETTLE_MS = 5;
   static constexpr uint8_t VBAT_SAMPLE_COUNT = 8;
-  // Akkuwarnung: bei Erreichen oder Unterschreiten blinken Anzeige und Akkusymbol.
+  // Akkuwarnung: erst nach mehreren aufeinanderfolgenden Messungen unter der Schwelle.
   static constexpr uint8_t LOW_BATTERY_PERCENT = 10;
-  // Abschaltung nach dieser Zeit unterhalb der Warnschwelle.
+  static constexpr uint8_t LOW_BATTERY_CONFIRM_SAMPLES = 3;
+  static constexpr uint8_t LOW_BATTERY_RECOVERY_MARGIN_PERCENT = 2;
+  static constexpr uint8_t LOW_BATTERY_RECOVERY_SAMPLES = 3;
+  // Abschaltung nach dieser Zeit mit bestaetigtem niedrigem Akku.
   static constexpr uint32_t LOW_BATTERY_SHUTDOWN_MS = 5UL * 60UL * 1000UL;
   static constexpr uint32_t LOW_BATTERY_BEEP_INTERVAL_MS = 5000;
   // Dauer einer sichtbaren bzw. ausgeblendeten Blinkphase.
@@ -173,6 +176,7 @@ struct Net {
   static constexpr uint32_t TRIGGER_MIN_INTERVAL_MS = 300;
   static constexpr uint32_t FLUSH_RETRY_MS = 500;
   static constexpr uint32_t VITALS_INTERVAL_MS = 10000;
+  // Bei getrenntem WLAN alle 5 s einen neuen Verbindungsversuch starten.
   static constexpr uint32_t WIFI_RETRY_MS = 5000;
 };
 
