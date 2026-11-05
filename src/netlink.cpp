@@ -20,6 +20,7 @@ struct Event {
   uint32_t id;
   int64_t pressUs;
   bool abortRun;
+  int64_t epochMs;  // Zeit des Drucks, beim Druck festgehalten (0 = Uhr war noch nicht synchron)
 };
 
 Event queue[cfg::Net::QUEUE_MAX];
@@ -42,6 +43,7 @@ portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
 // Pi-Adresse einmal aufloesen und merken: ein Namensabruf pro Anfrage kostete teils Sekunden.
 volatile uint32_t piIp = 0;
 volatile bool pollNow = false;
+volatile uint32_t lastServerOkMs = 0;
 volatile bool reregisterNow = false;
 
 // Firmware-Update vom Pi (OTA)
@@ -412,6 +414,7 @@ uint8_t pollDisplay() {
   http.end();
   forgetIp(code);
   if (code != 200) return roleState.role;
+  lastServerOkMs = millis() | 1;  // nie 0: 0 heisst "noch keine Antwort"
   if (jsonBool(body, "shutdown")) shutdownRequestedFlag = true;
   lowBatteryPct = (uint8_t)constrain(jsonInt(body, "low_battery_pct", lowBatteryPct), 0, 100);
   lowBatteryMin = (uint16_t)constrain(jsonInt(body, "low_battery_min", lowBatteryMin), 0, 1440);
@@ -512,7 +515,9 @@ uint8_t pollDisplay() {
 // Eine Zustellung mit Retry/Backoff. true: Event erledigt (entfernen).
 bool deliver(const Event& e) {
   if (WiFi.status() != WL_CONNECTED) return false;
-  int64_t ts = e.abortRun ? 0 : epochMsFor(e.pressUs);
+  // Der beim Druck festgehaltene Zeitstempel zaehlt: faellt der Pi aus und startet mit falscher Uhr
+  // neu, springt die Taster-Uhr beim naechsten Zeitabgleich und wuerde den Druck verschieben.
+  int64_t ts = e.abortRun ? 0 : (e.epochMs ? e.epochMs : epochMsFor(e.pressUs));
   if (!e.abortRun && ts == 0) return false;
   uint32_t backoff = cfg::Net::RETRY_BACKOFF_MS;
   for (int attempt = 1; attempt <= cfg::Net::RETRY_COUNT; attempt++) {
@@ -797,6 +802,7 @@ void begin() {
 
 bool enqueueEvent(int64_t pressUs, bool abortRun) {
   uint32_t id = ++counter;
+  const int64_t epochMs = abortRun ? 0 : epochMsFor(pressUs);
   bool queuedOk = false;
   bool dropped = false;
   portENTER_CRITICAL(&qMux);
@@ -806,7 +812,7 @@ bool enqueueEvent(int64_t pressUs, bool abortRun) {
     dropped = true;
   }
   if (cfg::Net::ENABLE_OFFLINE_QUEUE || qCount == 0) {
-    queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, pressUs, abortRun};
+    queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, pressUs, abortRun, epochMs};
     qCount++;
     queuedOk = true;
   }
@@ -847,6 +853,11 @@ bool roleInfo(RoleInfo& out) {
   bool ok = roleValid;
   portEXIT_CRITICAL(&roleMux);
   return ok;
+}
+
+bool serverOnline() {
+  const uint32_t ok = lastServerOkMs;
+  return ok != 0 && millis() - ok < cfg::Timing::OFFLINE_AFTER_MS;
 }
 
 uint8_t wifiLevel() {

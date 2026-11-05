@@ -161,6 +161,65 @@ void drawLaneList(const netlink::RoleInfo& ri, uint16_t bg) {
   }
 }
 
+uint16_t offlineBg(const netlink::RoleInfo& ri) {
+  switch (ri.state) {
+    case netlink::RoleInfo::RUNNING: return cfg::Colors::ROLE_RUNNING;
+    case netlink::RoleInfo::STOPPED: return cfg::Colors::ROLE_STOPPED;
+    default: return cfg::Colors::ROLE_READY;
+  }
+}
+
+// Pi nicht erreichbar: schlichte Stoppuhr (Rolle links, "Offline" rechts), die Zeiten werden spaeter nachgetragen.
+void drawOfflineRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) {
+  GFXcanvas16& c = display::canvas();
+  const uint16_t bg = offlineBg(ri);
+  c.fillScreen(bg);
+  c.setTextColor(cfg::Colors::WHITE);
+  char head[12];
+  if (ri.role == netlink::RoleInfo::STARTER) snprintf(head, sizeof(head), "Start");
+  else if (ri.role == netlink::RoleInfo::FINISH) snprintf(head, sizeof(head), "Ziel");
+  else snprintf(head, sizeof(head), "Bahn %u", ri.lane);
+  c.setFont(&FreeSans12pt7b);
+  c.setCursor(cfg::Screen::SAFE, cfg::Layout::ROLE_HEADER_Y);
+  c.print(head);
+  int16_t xb, yb;
+  uint16_t w, h;
+  c.getTextBounds("Offline", 0, 0, &xb, &yb, &w, &h);
+  c.setCursor(cfg::Screen::W - cfg::Screen::SAFE - (int)w, cfg::Layout::ROLE_HEADER_Y);
+  c.print("Offline");
+
+  if (ri.role == netlink::RoleInfo::FINISH) {
+    char n[24];
+    snprintf(n, sizeof(n), "%u Zeitnahmen", ri.laneCount);
+    c.fillRect(0, cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Screen::W, cfg::Layout::ROLE_TIME_BAND_H, bg);
+    c.setFont(&FreeSans12pt7b);
+    printCentered(n, cfg::Layout::ROLE_TIME_BASELINE_Y);
+  } else if (ri.role == netlink::RoleInfo::STARTER) {
+    // Start bestaetigen: Lauf und Zustand gross, damit klar ist, dass der Druck zaehlt
+    drawTime(ri, bg);
+    char s[32];
+    if (ri.state == netlink::RoleInfo::RUNNING) snprintf(s, sizeof(s), "Start Lauf %u", ri.run);
+    else if (ri.state == netlink::RoleInfo::STOPPED) snprintf(s, sizeof(s), "Lauf %u beendet", ri.run);
+    else snprintf(s, sizeof(s), "Bereit: Lauf %u", ri.run);
+    c.setFont(&FreeSans12pt7b);
+    c.setTextColor(cfg::Colors::WHITE);
+    printCentered(s, cfg::Layout::ROLE_NAME_Y);
+    c.setFont(&FreeSans9pt7b);
+    c.setTextColor(cfg::Colors::SUB);
+    printCentered(ri.state == netlink::RoleInfo::RUNNING ? "Start gesendet, Pi offline" : "Pi offline, Start zaehlt",
+                  cfg::Layout::ROLE_DISCIPLINE_Y);
+    display::renderBottomBar(bg, letter, m);
+    return;
+  } else {
+    drawTime(ri, bg);
+  }
+  c.setFont(&FreeSans9pt7b);
+  c.setTextColor(cfg::Colors::SUB);
+  printCentered("Pi nicht erreichbar", cfg::Layout::ROLE_NAME_Y);
+  printCentered("Zeiten werden nachgetragen", cfg::Layout::ROLE_DISCIPLINE_Y);
+  display::renderBottomBar(bg, letter, m);
+}
+
 }  // namespace
 
 // Funktest: Signalstaerke gross, Hintergrund gruen/gelb/rot
@@ -294,6 +353,11 @@ uint16_t drawAssign(char letter, const measure::Data& m, uint8_t pendingLane) {
 void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) {
   if (!display::ready()) return;
 
+  if (ri.offline) {
+    drawOfflineRole(ri, letter, m);
+    return;
+  }
+
   if (ri.role == netlink::RoleInfo::RANGE) {
     drawRange(ri, letter, m);
     return;
@@ -363,6 +427,11 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
 
 void drawRoleClock(const netlink::RoleInfo& ri) {
   if (!display::ready()) return;
+  if (ri.offline) {
+    drawTime(ri, offlineBg(ri));
+    display::flushRows(cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Layout::ROLE_TIME_BAND_H);
+    return;
+  }
   if (ri.role == netlink::RoleInfo::STARTER || ri.role == netlink::RoleInfo::FINISH) {
     drawLaneList(ri, roleBg(ri));
     display::flushRows(cfg::Layout::STARTER_LIST_TOP,

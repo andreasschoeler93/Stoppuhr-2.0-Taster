@@ -37,6 +37,14 @@ uint32_t localStopAtMs = 0;
 bool longPressSent = false;
 uint8_t shownPending = 0;
 int64_t pendingPressUs = 0;
+// Offline-Stoppuhr (Pi nicht erreichbar)
+bool offActive = false;
+bool offRunning = false;
+int64_t offStartUs = 0;
+int32_t offStopMs = -1;
+uint16_t offRun = 0;      // Lauf, den der Starter offline gestartet hat
+uint16_t offNextRun = 0;  // Lauf, den der naechste Start ausloest
+uint32_t lastOffKey = 0;
 
 }  // namespace
 
@@ -153,6 +161,30 @@ void loop() {
   }
   netlink::RoleInfo ri;
   const bool haveRole = netlink::roleInfo(ri) && ri.role != netlink::RoleInfo::NONE;
+  // Pi ausgefallen: statt der eingefrorenen Serverdaten laeuft eine lokale Stoppuhr
+  const bool offline = haveRole && ri.role != netlink::RoleInfo::RANGE && !netlink::serverOnline();
+  const bool timed = ri.role == netlink::RoleInfo::LANE || ri.role == netlink::RoleInfo::STARTER;
+  if (offline && !offActive) {
+    offActive = true;
+    offRunning = timed && ri.state == netlink::RoleInfo::RUNNING;
+    offStopMs = ri.role == netlink::RoleInfo::LANE && ri.state == netlink::RoleInfo::STOPPED ? ri.timeMs : -1;
+    // Starter: laufender Lauf behaelt seine Nummer, nach einem beendeten Lauf zaehlt der naechste
+    offRun = ri.run;
+    offNextRun = ri.state == netlink::RoleInfo::RUNNING || ri.state == netlink::RoleInfo::STOPPED
+                     ? ri.run + 1 : ri.run;
+    if (ri.role == netlink::RoleInfo::STARTER && ri.state == netlink::RoleInfo::STOPPED) offStopMs = 0;
+    if (offRunning) {
+      // Laufende Uhr nahtlos weiterzaehlen
+      offStartUs = esp_timer_get_time() - ((int64_t)ri.elapsedMs + (int32_t)(millis() - ri.recvMs)) * 1000;
+    }
+    if (localStop) {  // Stopp kurz vor dem Ausfall schon lokal angezeigt
+      offRunning = false;
+      offStopMs = localStopMs;
+    }
+  } else if (!offline && offActive) {
+    offActive = false;
+  }
+  if (offline) localStop = false;
   // Bereitschaft nur ohne Rolle; Anzeige wechselt bei jeder Aenderung
   const uint8_t pendingLane = haveRole ? 0 : ri.pendingLane;
   if (pendingButtonPress) {
@@ -165,8 +197,8 @@ void loop() {
     } else if (!button::down()) {
       if (!longPressSent) {
         // Bahn: Stoppzeit sofort selbst berechnen und anzeigen, der Server bestaetigt sie spaeter
-        if (haveRole && ri.role == netlink::RoleInfo::LANE && ri.state == netlink::RoleInfo::RUNNING &&
-            !localStop) {
+        if (!offline && haveRole && ri.role == netlink::RoleInfo::LANE &&
+            ri.state == netlink::RoleInfo::RUNNING && !localStop) {
           const uint32_t pressMs = millis() - (uint32_t)((esp_timer_get_time() - pendingPressUs) / 1000);
           const int32_t ms = ri.elapsedMs + (int32_t)(pressMs - ri.recvMs);
           if (ms >= 0) {
@@ -177,7 +209,23 @@ void loop() {
             localStopAtMs = millis();
           }
         }
-        netlink::sendTrigger(pendingPressUs);
+        const bool sent = netlink::sendTrigger(pendingPressUs);
+        if (offline && timed && sent) {
+          // Erster Druck startet, zweiter stoppt (Start kommt spaeter vom Starter und wird nachberechnet)
+          const int64_t sinceStartMs = (pendingPressUs - offStartUs) / 1000;
+          const bool isStarter = ri.role == netlink::RoleInfo::STARTER;
+          const int64_t minRunMs = isStarter ? cfg::Timing::OFFLINE_STARTER_STOP_MIN_MS
+                                             : cfg::Timing::OFFLINE_STOP_LOCKOUT_MS;
+          if (!offRunning) {
+            offRunning = true;
+            offStartUs = pendingPressUs;
+            offStopMs = -1;
+            if (isStarter) offRun = offNextRun++;
+          } else if (sinceStartMs >= minRunMs) {
+            offRunning = false;
+            offStopMs = (int32_t)sinceStartMs;
+          }
+        }
         beep::click();
       }
       pendingButtonPress = false;
@@ -227,6 +275,24 @@ void loop() {
   const bool localChanged = localShown != lastLocalShown;
   lastLocalShown = localShown;
 
+  // Offline-Anzeige aus der lokalen Uhr; Aenderungen (auch Wechsel online/offline) zeichnen neu
+  uint32_t offKey = 0;
+  if (offActive) {
+    ri.offline = true;
+    ri.state = offRunning ? netlink::RoleInfo::RUNNING
+             : offStopMs >= 0 ? netlink::RoleInfo::STOPPED
+                              : netlink::RoleInfo::READY;
+    ri.timeMs = offStopMs;
+    ri.run = (offRunning || offStopMs >= 0) ? offRun : offNextRun;
+    ri.recvMs = millis();
+    ri.elapsedMs = offRunning ? (int32_t)((esp_timer_get_time() - offStartUs) / 1000) : 0;
+    const size_t pendingCount = netlink::queued();
+    ri.laneCount = pendingCount > 255 ? 255 : (uint8_t)pendingCount;
+    offKey = 1 + ri.state * 256u + ri.run * 4096u + (ri.role == netlink::RoleInfo::FINISH ? ri.laneCount * 268435456u : 0);
+  }
+  const bool offChanged = offKey != lastOffKey;
+  lastOffKey = offKey;
+
   if (uiMode == UiMode::SPLASH) {
     if (millis() - modeStartedMs >= cfg::Timing::SPLASH_MS) {
       if (haveRole) {
@@ -259,7 +325,8 @@ void loop() {
           beep::lowBattery();
         }
       }
-    } else if (uiMode != UiMode::ROLE || ri.seq != roleSeq || localChanged || (changed & measure::CHANGED_BATTERY)) {
+    } else if (uiMode != UiMode::ROLE || ri.seq != roleSeq || localChanged || offChanged ||
+               (changed & measure::CHANGED_BATTERY)) {
       uiMode = UiMode::ROLE;
       roleSeq = ri.seq;
       screens::drawRole(ri, assignLetter, m);

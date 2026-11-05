@@ -14,6 +14,8 @@ bool sendTrigger(int64_t pressUs);
 // Legt die Anforderung zum Abbrechen und Wiederholen des aktuellen Laufs in die Warteschlange.
 bool sendAbortRun(int64_t pressUs);
 size_t queued();
+// false, wenn der Pi seit einigen Sekunden nicht mehr antwortet (oder noch nie geantwortet hat)
+bool serverOnline();
 // 0 = nicht verbunden, 1..4 = Signalstaerke
 uint8_t wifiLevel();
 // Signalstaerke in dBm (0, wenn nicht verbunden)
@@ -32,6 +34,9 @@ struct RoleInfo {
   enum Role : uint8_t { NONE = 0, STARTER = 1, LANE = 2, FINISH = 3, RANGE = 4 };
   enum State : uint8_t { READY = 0, RUNNING = 1, STOPPED = 2, INACTIVE = 3 };
   uint8_t role = NONE;
+  // Vom Taster selbst gesetzt, solange der Pi nicht erreichbar ist (lokale Uhr statt Serverdaten).
+  // Beim Ziel zaehlt laneCount dann die noch nicht gesendeten Zeitnahmen.
+  bool offline = false;
   // Funktest (Rolle RANGE): Signalstaerke in dBm, ab der gelb bzw. rot gewarnt wird
   int8_t rangeWarn = -75;
   int8_t rangeCrit = -85;

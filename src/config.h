@@ -36,7 +36,7 @@
 
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 16
+#define FW_VERSION_MINOR 17
 #define FW_VERSION_PATCH 0
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
@@ -142,6 +142,12 @@ struct Timing {
   static constexpr uint32_t LOW_BATTERY_BLINK_MS = 500;
   // Laufende Uhr in den Rollenansichten: nur das Zeitfeld wird so oft neu uebertragen
   static constexpr uint32_t ROLE_CLOCK_MS = 60;
+  // Pi gilt als ausgefallen, wenn so lange keine Anzeigedaten mehr kamen; danach laeuft eine lokale Uhr
+  static constexpr uint32_t OFFLINE_AFTER_MS = 3000;
+  // Offline: ein zweiter Druck so kurz nach dem Start stoppt die lokale Uhr nicht (wie die Stopp-Sperre des Pi)
+  static constexpr uint32_t OFFLINE_STOP_LOCKOUT_MS = 5000;
+  // Starter offline: ein zweiter Druck davor gilt als Prellen (wie am Pi)
+  static constexpr uint32_t OFFLINE_STARTER_STOP_MIN_MS = 1500;
 };
 
 // Schnittstelle zum Pi (nur internes WLAN/LAN, siehe README "Taster <-> Pi Schnittstelle")
