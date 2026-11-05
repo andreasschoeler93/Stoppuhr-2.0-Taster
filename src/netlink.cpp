@@ -436,6 +436,7 @@ uint8_t pollDisplay() {
           : !strcmp(stateText, "inactive") ? RoleInfo::INACTIVE
                                            : RoleInfo::READY;
   r.lane = (uint8_t)jsonInt(body, "lane", 0);
+  r.maxLane = (uint8_t)constrain(jsonInt(body, "max_lane", 0), 0, RoleInfo::MAX_LANES);
   char pendingText[12];
   jsonStr(body, "pending_lane", pendingText, sizeof(pendingText));
   r.pendingLane = !strcmp(pendingText, "starter") ? RoleInfo::PENDING_STARTER

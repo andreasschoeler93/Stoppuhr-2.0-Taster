@@ -189,11 +189,9 @@ void drawOfflineRole(const netlink::RoleInfo& ri, char letter, const measure::Da
   c.print("Offline");
 
   if (ri.role == netlink::RoleInfo::FINISH) {
-    char n[24];
-    snprintf(n, sizeof(n), "%u Zeitnahmen", ri.laneCount);
-    c.fillRect(0, cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Screen::W, cfg::Layout::ROLE_TIME_BAND_H, bg);
-    c.setFont(&FreeSans12pt7b);
-    printCentered(n, cfg::Layout::ROLE_TIME_BASELINE_Y);
+    drawLaneList(ri, bg);
+    display::renderBottomBar(bg, letter, m);
+    return;
   } else if (ri.role == netlink::RoleInfo::STARTER) {
     // Start bestaetigen: Lauf und Zustand gross, damit klar ist, dass der Druck zaehlt
     drawTime(ri, bg);
@@ -428,6 +426,12 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
 void drawRoleClock(const netlink::RoleInfo& ri) {
   if (!display::ready()) return;
   if (ri.offline) {
+    if (ri.role == netlink::RoleInfo::FINISH) {
+      drawLaneList(ri, offlineBg(ri));
+      display::flushRows(cfg::Layout::STARTER_LIST_TOP,
+                         cfg::Layout::STARTER_LIST_BOTTOM - cfg::Layout::STARTER_LIST_TOP);
+      return;
+    }
     drawTime(ri, offlineBg(ri));
     display::flushRows(cfg::Layout::ROLE_TIME_BAND_TOP, cfg::Layout::ROLE_TIME_BAND_H);
     return;
