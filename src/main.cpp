@@ -121,6 +121,13 @@ void loop() {
       beep::click();
     }
     pendingButtonPress = false;
+  } else if (netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::STARTER &&
+             finishRole.combo && !netlink::serverOnline()) {
+    // Starter mit Zieleinlauf, Pi aus: Druecke bedienen die lokalen Uhren (siehe offFin*)
+    while (button::pressed(&pressUs)) {
+      if (finPressN < sizeof(finPress) / sizeof(finPress[0])) finPress[finPressN++] = pressUs;
+    }
+    pendingButtonPress = false;
   } else if (!pendingButtonPress && button::pressed(&pressUs)) {
     pendingPressUs = pressUs;
     pendingButtonPress = true;
@@ -175,7 +182,8 @@ void loop() {
   const bool haveRole = netlink::roleInfo(ri) && ri.role != netlink::RoleInfo::NONE;
   // Pi ausgefallen: statt der eingefrorenen Serverdaten laeuft eine lokale Stoppuhr
   const bool offline = haveRole && ri.role != netlink::RoleInfo::RANGE && !netlink::serverOnline();
-  const bool timed = ri.role == netlink::RoleInfo::LANE || ri.role == netlink::RoleInfo::STARTER;
+  const bool timed = ri.role == netlink::RoleInfo::LANE || (ri.role == netlink::RoleInfo::STARTER && !ri.combo);
+  const bool finLike = ri.role == netlink::RoleInfo::FINISH || (ri.role == netlink::RoleInfo::STARTER && ri.combo);
   if (offline && !offActive) {
     offActive = true;
     offRunning = timed && ri.state == netlink::RoleInfo::RUNNING;
@@ -193,9 +201,10 @@ void loop() {
       offRunning = false;
       offStopMs = localStopMs;
     }
-    if (ri.role == netlink::RoleInfo::FINISH) {
-      const uint8_t n = ri.maxLane ? ri.maxLane : ri.laneCount;
+    if (finLike) {
+      const uint8_t n = ri.maxLane ? ri.maxLane :       ri.laneCount;
       offFinLanes = n > netlink::RoleInfo::MAX_LANES ? netlink::RoleInfo::MAX_LANES : n;
+      if (offFinLanes == 0) offFinLanes = 1;
       offFinStarted = ri.state == netlink::RoleInfo::RUNNING;
       offFinCount = 0;
       for (uint8_t i = 0; i < ri.laneCount && i < offFinLanes; i++) {
@@ -210,14 +219,17 @@ void loop() {
     offActive = false;
   }
   if (!offline) finPressN = 0;
-  if (offline && ri.role == netlink::RoleInfo::FINISH) {
+  if (offline && finLike) {
+    const bool isStarter = ri.role == netlink::RoleInfo::STARTER;
     for (uint8_t i = 0; i < finPressN; i++) {
       const int64_t us = finPress[i];
       if (!offFinStarted || offFinCount >= offFinLanes) {
-        // Start (kein Zieleinlauf, wird nicht gesendet); der Pi rechnet den Start vom Starter nach
+        // Start; der Zieleinlauf-Taster sendet ihn nicht (der Pi rechnet den Start vom Starter nach)
+        if (isStarter && !netlink::sendTrigger(us)) continue;
         offFinStarted = true;
         offFinCount = 0;
         offStartUs = us;
+        if (isStarter) offRun = offNextRun++;
         beep::click();
       } else if (netlink::sendTrigger(us)) {
         offFinMs[offFinCount++] = (int32_t)((us - offStartUs) / 1000);
@@ -328,7 +340,8 @@ void loop() {
     ri.run = (offRunning || offStopMs >= 0) ? offRun : offNextRun;
     ri.recvMs = millis();
     ri.elapsedMs = offRunning ? (int32_t)((esp_timer_get_time() - offStartUs) / 1000) : 0;
-    if (ri.role == netlink::RoleInfo::FINISH) {
+    if (finLike) {
+      if (ri.role == netlink::RoleInfo::STARTER) ri.run = offFinStarted ? offRun : offNextRun;
       const bool allDone = offFinStarted && offFinCount >= offFinLanes;
       ri.state = allDone ? netlink::RoleInfo::STOPPED
                : offFinStarted ? netlink::RoleInfo::RUNNING : netlink::RoleInfo::READY;

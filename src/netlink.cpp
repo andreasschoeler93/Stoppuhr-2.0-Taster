@@ -437,6 +437,7 @@ uint8_t pollDisplay() {
                                            : RoleInfo::READY;
   r.lane = (uint8_t)jsonInt(body, "lane", 0);
   r.maxLane = (uint8_t)constrain(jsonInt(body, "max_lane", 0), 0, RoleInfo::MAX_LANES);
+  r.combo = jsonInt(body, "combo", 0) != 0;
   char pendingText[12];
   jsonStr(body, "pending_lane", pendingText, sizeof(pendingText));
   r.pendingLane = !strcmp(pendingText, "starter") ? RoleInfo::PENDING_STARTER

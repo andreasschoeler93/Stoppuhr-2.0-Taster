@@ -38,6 +38,7 @@ struct RoleInfo {
   // Beim Ziel zaehlt laneCount dann die noch nicht gesendeten Zeitnahmen.
   bool offline = false;
   uint8_t maxLane = 0;  // hoechste Bahn im Wettkampf (Startkarten)
+  bool combo = false;   // Starter ist zugleich Zieleinlauf
   // Funktest (Rolle RANGE): Signalstaerke in dBm, ab der gelb bzw. rot gewarnt wird
   int8_t rangeWarn = -75;
   int8_t rangeCrit = -85;

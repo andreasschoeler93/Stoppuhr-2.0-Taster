@@ -188,7 +188,7 @@ void drawOfflineRole(const netlink::RoleInfo& ri, char letter, const measure::Da
   c.setCursor(cfg::Screen::W - cfg::Screen::SAFE - (int)w, cfg::Layout::ROLE_HEADER_Y);
   c.print("Offline");
 
-  if (ri.role == netlink::RoleInfo::FINISH) {
+  if (ri.role == netlink::RoleInfo::FINISH || (ri.role == netlink::RoleInfo::STARTER && ri.combo)) {
     drawLaneList(ri, bg);
     display::renderBottomBar(bg, letter, m);
     return;
@@ -426,7 +426,7 @@ void drawRole(const netlink::RoleInfo& ri, char letter, const measure::Data& m) 
 void drawRoleClock(const netlink::RoleInfo& ri) {
   if (!display::ready()) return;
   if (ri.offline) {
-    if (ri.role == netlink::RoleInfo::FINISH) {
+    if (ri.role == netlink::RoleInfo::FINISH || (ri.role == netlink::RoleInfo::STARTER && ri.combo)) {
       drawLaneList(ri, offlineBg(ri));
       display::flushRows(cfg::Layout::STARTER_LIST_TOP,
                          cfg::Layout::STARTER_LIST_BOTTOM - cfg::Layout::STARTER_LIST_TOP);
