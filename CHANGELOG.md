@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.19.4 | 2026-11-12 | 0.41.11 | Mindestabstand für alle Rollen 300 ms. Starter-Abbruchwarnung erst nach mehr als einer Sekunde Halten; online zeigt die Bahn nur vom Pi bestätigte Stoppzeiten statt einer möglicherweise falschen lokalen Stoppzeit. |
 | v0.19.3 | 2026-11-12 | 0.41.11 | Tastendrücke: 1 s Mindestabstand für Bahn und normalen Starter, 300 ms für Zieleinlauf und kombinierte Starter-/Zieleinlaufrolle; verworfene Drücke piepen nicht. |
 | v0.19.2 | 2026-11-12 | 0.41.11 | Tastendruck und Quittung sofort; Starter-Langdruck nach 5 s mit Warnanzeige und wiederholtem Ton. Abbruch wird dem auslösenden Druck zugeordnet und erst nach Pi-Bestätigung bestätigt. |
 | v0.19.1 | 2026-11-12 | 0.41.6 | Diagnose-Ringpuffer für Start, WLAN, Rollenwechsel, Messfehler und Netzwerkfehler; der Pi übernimmt die letzten 24 Meldungen je Taster. |

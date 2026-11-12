@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.19.3)
+# Taster – Firmware (v0.19.4)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -92,7 +92,9 @@ Ohne Rolle zeigt der Taster die Zuordnung (Akku-Prozent und Buchstabe, untere Le
 - **Start** (rot): Kopfzeile „Start“ / „Lauf N“, darunter alle Bahnen des Laufs (links Ziffer, rechts Zeit; `--:--,--` solange die Bahn wartet).
 - **Bahn N**: blau = bereit, grün = läuft, grau = gestoppt oder ohne Startkarte; Name, Disziplin, letzte Zeit. Gestoppte Zeiten stehen in Gelb.
 
-Beim Stoppen zeigt die Bahn die eigene Zeit sofort in Gelb und hält sie, bis der Pi den Stopp bestätigt hat.
+Online zeigt die Bahn die Stoppzeit in Gelb, sobald sie vom Pi gemeldet wird. So wird bei einem wegen der
+Stopp-Sperre ignorierten Druck keine falsche Stoppzeit angezeigt; die Anzeige kann sich um die Netzwerk- und
+Abfragezeit verzögern. Der Tastendruck selbst wird weiterhin sofort gesendet.
 Die laufende Uhr rechnet lokal weiter und überträgt nur das Zeitfeld. Namen und Disziplinen unterstützen deutsche Umlaute (UTF-8 vom Pi).
 „Wettkampf beenden“ im Pi sendet einen befristeten Abschaltbefehl; der Taster trennt dann die Selbsthaltung (GPIO44) und schaltet sich aus.
 
@@ -106,13 +108,12 @@ Der Zieleinlauf-Taster zeigt dieselbe Liste wie der Starter (Kopf „Ziel“, vi
 ### Starter: Abbruch
 
 Alle Drücke werden beim Drücken verarbeitet und durch einen kurzen Ton quittiert, nicht erst beim Loslassen.
-Nach einem angenommenen Druck werden weitere Drücke bei Bahn und normalem Starter für 1 Sekunde ignoriert,
-beim Zieleinlauf und dem kombinierten Starter/Zieleinlauf für 300 ms. Das gilt auch offline; ignorierte Drücke
-piepen nicht und erzeugen kein Ereignis. Damit bleiben schnelle Zieleinläufe möglich, aber auch dort werden
-zwei echte Drücke innerhalb von 300 ms nicht getrennt erfasst. Andere Signaltöne (z. B. Laufstart oder
+Nach einem angenommenen Druck werden weitere Drücke bei allen Rollen für 300 ms ignoriert. Das gilt auch
+offline; ignorierte Drücke piepen nicht und erzeugen kein Ereignis. Zwei echte Drücke innerhalb von 300 ms
+werden nicht getrennt erfasst. Andere Signaltöne (z. B. Laufstart oder
 Bahnstopp) und das Sekunden-Piepen beim gehaltenen Starter bleiben erhalten.
 Wird der Starter fünf Sekunden gehalten, fordert er den Abbruch des zu diesem Druck gehörenden Versuchs an:
-Während des Haltens erscheinen „Achtung Startabbruch“ mit rot/grün wechselndem Hintergrund und ein Piepton pro Sekunde.
+Nach mehr als einer Sekunde Halten erscheint „Achtung Startabbruch“ mit rot/grün wechselndem Hintergrund; beim Halten ertönt ein Piepton pro Sekunde.
 Der erste Druck hat schon als Start, Stopp oder Zieleinlauf gewirkt; ein zuvor extern abgerufenes Ergebnis kann nicht
 zurückgeholt werden. Die Anzeige unterscheidet „Warte auf Pi“, Bestätigung und Fehler. Erst die Pi-Bestätigung und
 das anschließende dreimal lange Piepen bestätigen den Abbruch. Offline wird die Anfrage nachgeliefert; geht der

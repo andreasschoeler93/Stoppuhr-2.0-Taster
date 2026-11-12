@@ -30,12 +30,6 @@ uint32_t modeStartedMs = 0;
 char assignLetter = '?';
 uint16_t assignBg = cfg::Colors::PREP_BG;
 bool pendingButtonPress = false;
-bool localStop = false;
-bool lastLocalShown = false;
-int32_t localStopMs = 0;
-uint16_t localStopRun = 0;
-uint16_t localStopAttempt = 0;
-uint32_t localStopAtMs = 0;
 bool longPressSent = false;
 bool pendingTriggered = false;
 bool pendingStarter = false;
@@ -126,13 +120,13 @@ void loop() {
         // Pi nicht erreichbar: Offline-Uhren bedienen (weiter unten), siehe offFin*
         if (finPressN >= sizeof(finPress) / sizeof(finPress[0])) {
           device_log::addf("finish press buffer full");
-        } else if (pressGate.accept(pressUs, cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS)) {
+        } else if (pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS)) {
           finPress[finPressN++] = pressUs;
           beep::click();
         }
         continue;
       }
-      if (pressGate.accept(pressUs, cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS) &&
+      if (pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS) &&
           netlink::sendTrigger(pressUs)) beep::click();
     }
     pendingButtonPress = false;
@@ -144,7 +138,7 @@ void loop() {
         device_log::addf("finish press buffer full");
         continue;
       }
-      if (!pressGate.accept(pressUs, cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS)) continue;
+      if (!pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS)) continue;
       finPress[finPressN++] = pressUs;
       beep::click();
       pendingPressUs = pressUs;
@@ -154,9 +148,7 @@ void loop() {
       longPressSent = false;
     }
   } else if (!pendingButtonPress && button::pressed(&pressUs)) {
-    const bool combo = finishRole.role == netlink::RoleInfo::STARTER && finishRole.combo;
-    const uint32_t interval = combo ? cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS : cfg::Net::TRIGGER_MIN_INTERVAL_MS;
-    if (pressGate.accept(pressUs, interval) && netlink::sendTrigger(pressUs)) {
+    if (pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS) && netlink::sendTrigger(pressUs)) {
       pendingPressUs = pressUs;
       pendingButtonPress = true;
       pendingStarter = finishRole.role == netlink::RoleInfo::STARTER;
@@ -232,10 +224,6 @@ void loop() {
       // Laufende Uhr nahtlos weiterzaehlen
       offStartUs = esp_timer_get_time() - ((int64_t)ri.elapsedMs + (int32_t)(millis() - ri.recvMs)) * 1000;
     }
-    if (localStop) {  // Stopp kurz vor dem Ausfall schon lokal angezeigt
-      offRunning = false;
-      offStopMs = localStopMs;
-    }
     if (finLike) {
       const uint8_t n = ri.maxLane ? ri.maxLane :       ri.laneCount;
       offFinLanes = n > netlink::RoleInfo::MAX_LANES ? netlink::RoleInfo::MAX_LANES : n;
@@ -271,24 +259,10 @@ void loop() {
     }
   }
   finPressN = 0;
-  if (offline) localStop = false;
   // Bereitschaft nur ohne Rolle; Anzeige wechselt bei jeder Aenderung
   const uint8_t pendingLane = haveRole ? 0 : ri.pendingLane;
   if (pendingButtonPress) {
     if (!pendingTriggered) {
-      // Bahn: Stoppzeit sofort selbst berechnen und anzeigen, der Server bestaetigt sie spaeter
-      if (!offline && haveRole && ri.role == netlink::RoleInfo::LANE &&
-          ri.state == netlink::RoleInfo::RUNNING && !localStop) {
-        const uint32_t pressMs = millis() - (uint32_t)((esp_timer_get_time() - pendingPressUs) / 1000);
-        const int32_t ms = ri.elapsedMs + (int32_t)(pressMs - ri.recvMs);
-        if (ms >= 0) {
-          localStop = true;
-          localStopMs = ms;
-          localStopRun = ri.run;
-          localStopAttempt = ri.attempt;
-          localStopAtMs = millis();
-        }
-      }
       if (offline && timed && pendingSent) {
         // Erster Druck startet, zweiter stoppt (Start kommt spaeter vom Starter und wird nachberechnet)
         const int64_t sinceStartMs = (pendingPressUs - offStartUs) / 1000;
@@ -345,24 +319,6 @@ void loop() {
     sigStopped = stopped;
   }
 
-  // Lokale Stoppzeit anzeigen, bis der Server den Stopp bestaetigt (oder verwirft)
-  bool localShown = false;
-  if (localStop) {
-    // Solange der Druck noch nicht beim Server angekommen ist, bleibt die lokale Zeit stehen
-    if (netlink::queued() > 0) localStopAtMs = millis();
-    if (haveRole && ri.role == netlink::RoleInfo::LANE && ri.run == localStopRun &&
-        ri.attempt == localStopAttempt && ri.state == netlink::RoleInfo::RUNNING &&
-        millis() - localStopAtMs < cfg::Timing::LOCAL_STOP_HOLD_MS) {
-      ri.state = netlink::RoleInfo::STOPPED;
-      ri.timeMs = localStopMs;
-      localShown = true;
-    } else {
-      localStop = false;
-    }
-  }
-  const bool localChanged = localShown != lastLocalShown;
-  lastLocalShown = localShown;
-
   // Offline-Anzeige aus der lokalen Uhr; Aenderungen (auch Wechsel online/offline) zeichnen neu
   uint32_t offKey = 0;
   if (offActive) {
@@ -414,7 +370,9 @@ void loop() {
     }
   }
   const bool showAbortNotice = abortNoticePressUs && millis() - abortNoticeAtMs < 4000;
-  if (holdingStarter || showAbortNotice) {
+  const bool showHoldWarning = holdingStarter &&
+      showStarterHoldWarning(esp_timer_get_time() - pendingPressUs, cfg::Timing::STARTER_HOLD_WARNING_MS);
+  if (showHoldWarning || showAbortNotice) {
     const netlink::AbortStatus shownStatus = holdingStarter && !longPressSent
                                                 ? netlink::AbortStatus::NONE : lastAbortStatus;
     const bool red = (millis() / 500) % 2 == 0;
@@ -465,7 +423,7 @@ void loop() {
           beep::lowBattery();
         }
       }
-    } else if (uiMode != UiMode::ROLE || ri.seq != roleSeq || localChanged || offChanged ||
+    } else if (uiMode != UiMode::ROLE || ri.seq != roleSeq || offChanged ||
                (changed & measure::CHANGED_BATTERY)) {
       uiMode = UiMode::ROLE;
       roleSeq = ri.seq;

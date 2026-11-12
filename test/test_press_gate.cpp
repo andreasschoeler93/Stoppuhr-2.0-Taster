@@ -1,22 +1,16 @@
 #include "../src/press_gate.h"
 
-constexpr bool normalInterval() {
-  PressGate gate;
-  return gate.accept(1000000, 1000) &&
-         !gate.accept(1999999, 1000) &&
-         gate.accept(2000000, 1000) &&
-         !gate.accept(1999999, 1000) &&
-         gate.accept(3000000, 1000);
-}
-
-constexpr bool finishInterval() {
+constexpr bool pressInterval() {
   PressGate gate;
   return gate.accept(1000000, 300) &&
          !gate.accept(1299999, 300) &&
          gate.accept(1300000, 300) &&
+         !gate.accept(1299999, 300) &&
          !gate.accept(1599999, 300) &&
          gate.accept(1600000, 300);
 }
 
-static_assert(normalInterval(), "normal press interval");
-static_assert(finishInterval(), "finish press interval");
+static_assert(pressInterval(), "300 ms press interval");
+static_assert(!showStarterHoldWarning(999999, 1000), "no warning before one second");
+static_assert(!showStarterHoldWarning(1000000, 1000), "no warning at one second");
+static_assert(showStarterHoldWarning(1000001, 1000), "warning after one second");
