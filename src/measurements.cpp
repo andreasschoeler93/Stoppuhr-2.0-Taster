@@ -4,6 +4,7 @@
 #include <Adafruit_AHTX0.h>
 
 #include "config.h"
+#include "device_log.h"
 
 namespace measure {
 namespace {
@@ -20,6 +21,8 @@ bool batteryWarningConfigured = false;
 bool batteryWarningOn = false;
 bool batteryAtOrBelowThreshold = false;
 bool batterySampleProcessed = false;
+bool batteryValidityKnown = false;
+bool batteryWasValid = true;
 uint32_t lastBatteryWarningSampleId = 0;
 uint32_t lowBatteryCandidateSinceMs = 0;
 uint32_t lowBatteryDurationMs = 0;
@@ -93,6 +96,12 @@ BatteryReading readBatteryVoltage() {
   reading.valid = isfinite(reading.batteryVoltage)
     && reading.batteryVoltage >= 2.5f
     && reading.batteryVoltage <= 4.5f;
+  if ((!reading.valid && (!batteryValidityKnown || batteryWasValid)) ||
+      (reading.valid && batteryValidityKnown && !batteryWasValid)) {
+    device_log::addf("battery voltage %s", reading.valid ? "recovered" : "out of range");
+  }
+  batteryValidityKnown = true;
+  batteryWasValid = reading.valid;
   return reading;
 }
 
@@ -152,6 +161,7 @@ uint8_t reinitializeAht() {
 
   g.ahtOk = aht.begin(&Wire);
   ahtFail = 0;
+  device_log::addf("AHT20 reinitialized: %s", g.ahtOk ? "ok" : "failed");
 #if DBG
   Serial.printf("[AHT] begin=%s\n", g.ahtOk ? "OK" : "FAIL");
 #endif
@@ -194,6 +204,7 @@ uint8_t pollAht() {
   // Einzelne Fehlmessungen behalten den letzten Wert, damit nichts flackert.
   uint8_t result = CHANGED_NONE;
   ++ahtFail;
+  if (ahtFail == 1) device_log::addf("AHT20 reading invalid");
 #if DBG
   Serial.println("[AHT] invalid reading");
 #endif

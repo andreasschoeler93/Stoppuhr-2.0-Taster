@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "device_log.h"
 #include "measurements.h"
 
 namespace netlink {
@@ -234,6 +235,8 @@ void popIfHead(uint32_t id) {
 }
 
 void logLine(uint32_t id, int attempt, int status, const char* action) {
+  device_log::addf("trigger id=%lu attempt=%d http=%d action=%s",
+                   static_cast<unsigned long>(id), attempt, status, action);
 #if DBG
   Serial.printf("[NET] event=%lu attempt=%d http=%d action=%s\n", (unsigned long)id, attempt, status, action);
 #endif
@@ -291,7 +294,7 @@ int postAbortRun(const Event& e) {
 void postVitals() {
   if (WiFi.status() != WL_CONNECTED) return;
   const measure::Data m = measure::data();
-  char body[360];
+  static char body[6144];
   char t[16], h[16];
   if (m.ahtOk && isfinite(m.temperature) && isfinite(m.humidity)) {
     snprintf(t, sizeof(t), "%.1f", m.temperature);
@@ -306,12 +309,23 @@ void postVitals() {
   char clock[40] = "";
   int64_t nowEpoch = epochMsFor(esp_timer_get_time());
   if (nowEpoch != 0) snprintf(clock, sizeof(clock), ",\"clock_ms\":%llu", (unsigned long long)nowEpoch);
-  snprintf(body, sizeof(body),
+  const int baseLength = snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
-           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s}",
+           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s,\"logs\":",
            deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
            WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000),
            (unsigned long)ackVer, clock);
+  if (baseLength < 0 || static_cast<size_t>(baseLength) >= sizeof(body)) {
+    device_log::addf("vitals payload prefix too large");
+    return;
+  }
+  const size_t logsLength = device_log::appendJson(body + baseLength, sizeof(body) - baseLength);
+  if (!logsLength || static_cast<size_t>(baseLength) + logsLength + 1 >= sizeof(body)) {
+    device_log::addf("diagnostic log payload too large");
+    return;
+  }
+  body[baseLength + logsLength] = '}';
+  body[baseLength + logsLength + 1] = '\0';
 
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
@@ -321,6 +335,7 @@ void postVitals() {
   if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.POST(body);
   http.end();
+  if (code != 200) device_log::addf("vitals upload failed http=%d", code);
 #if DBG
   Serial.printf("[NET] vitals http=%d\n", code);
 #endif
@@ -348,6 +363,7 @@ bool registerTaster() {
     }
   }
   http.end();
+  if (code != 200) device_log::addf("registration failed http=%d", code);
 #if DBG
   Serial.printf("[NET] register name=%s letter=%c http=%d\n", deviceName.c_str(), tasterLetter, code);
 #endif
@@ -415,7 +431,10 @@ uint8_t pollDisplay() {
   forgetIp(code);
   if (code != 200) return roleState.role;
   lastServerOkMs = millis() | 1;  // nie 0: 0 heisst "noch keine Antwort"
-  if (jsonBool(body, "shutdown")) shutdownRequestedFlag = true;
+  if (jsonBool(body, "shutdown")) {
+    device_log::addf("shutdown request received");
+    shutdownRequestedFlag = true;
+  }
   lowBatteryPct = (uint8_t)constrain(jsonInt(body, "low_battery_pct", lowBatteryPct), 0, 100);
   lowBatteryMin = (uint16_t)constrain(jsonInt(body, "low_battery_min", lowBatteryMin), 0, 1440);
 
@@ -509,7 +528,10 @@ uint8_t pollDisplay() {
   roleValid = true;
   portEXIT_CRITICAL(&roleMux);
 #if DBG
-  if (!same) Serial.printf("[NET] rolle=%s state=%s bahn=%u lauf=%u\n", roleText, stateText, r.lane, r.run);
+  if (!same) {
+    device_log::addf("role=%s state=%s lane=%u run=%u", roleText, stateText, r.lane, r.run);
+    Serial.printf("[NET] rolle=%s state=%s bahn=%u lauf=%u\n", roleText, stateText, r.lane, r.run);
+  }
 #endif
   return r.role;
 }
@@ -759,13 +781,16 @@ void begin() {
   WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
 #if DBG
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
+    device_log::addf("WiFi disconnected reason=%u", info.wifi_sta_disconnected.reason);
     Serial.printf("[WIFI] getrennt, Grund=%d (2=Auth, 15=4-Wege-Handshake, 201=SSID nicht gefunden, 202=Auth fehlgeschlagen)\n",
                   info.wifi_sta_disconnected.reason);
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) {
+    device_log::addf("WiFi connected rssi=%d", WiFi.RSSI());
     Serial.printf("[WIFI] verbunden: SSID=%s IP=%s RSSI=%d Kanal=%ld\n", WiFi.SSID().c_str(),
                   WiFi.localIP().toString().c_str(), WiFi.RSSI(), (long)WiFi.channel());
   }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  device_log::addf("WiFi connecting");
   Serial.printf("[WIFI] suche SSID=\"%s\" (%u Zeichen Passwort)\n", creds.ssid,
                 (unsigned)strlen(creds.pass));
 #endif

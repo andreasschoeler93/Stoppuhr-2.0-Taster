@@ -12,6 +12,7 @@
 #include "beep.h"
 #include "button.h"
 #include "config.h"
+#include "device_log.h"
 #include "display.h"
 #include "measurements.h"
 #include "netlink.h"
@@ -67,6 +68,7 @@ void setup() {
   Serial.printf("Reset-Grund: %d (1=Power-on 3=SW 4=Panic 5=IntWDT 6=TaskWDT 7=WDT 9=Brownout)\n",
                 (int)esp_reset_reason());
 #endif
+  device_log::addf("start fw=%s reset_reason=%d", FW_VERSION, (int)esp_reset_reason());
 
   button::begin();
   beep::begin();
@@ -154,6 +156,7 @@ void loop() {
   const bool lowBattery = measure::batteryWarningActive();
   if (lowBattery) {
     if (!lowBatteryWasActive) {
+      device_log::addf("battery warning active");
       lastLowBatteryBeepMs = now;
       lastLowBatteryBlinkMs = now;
       beep::lowBattery();
@@ -163,6 +166,7 @@ void loop() {
       beep::lowBattery();
     }
     if (measure::batteryShutdownDue(netlink::lowBatteryShutdownMs())) {
+      device_log::addf("shutdown due to low battery");
       digitalWrite(cfg::Pins::HOLD, LOW);
       return;
     }
