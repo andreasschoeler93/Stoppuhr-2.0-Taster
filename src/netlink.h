@@ -13,6 +13,8 @@ void begin();
 bool sendTrigger(int64_t pressUs);
 // Legt die Anforderung zum Abbrechen und Wiederholen des aktuellen Laufs in die Warteschlange.
 bool sendAbortRun(int64_t pressUs);
+enum class AbortStatus : uint8_t { NONE, PENDING, CONFIRMED, FAILED };
+AbortStatus abortStatus(int64_t pressUs);
 size_t queued();
 // false, wenn der Pi seit einigen Sekunden nicht mehr antwortet (oder noch nie geantwortet hat)
 bool serverOnline();

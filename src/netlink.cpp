@@ -28,6 +28,9 @@ Event queue[cfg::Net::QUEUE_MAX];
 size_t qHead = 0;
 size_t qCount = 0;
 uint32_t counter = 0;
+uint32_t bootId = 0;
+int64_t abortPressUs = 0;
+AbortStatus abortResult = AbortStatus::NONE;
 uint32_t lastTriggerMs = 0;
 bool haveTrigger = false;
 portMUX_TYPE qMux = portMUX_INITIALIZER_UNLOCKED;
@@ -256,8 +259,9 @@ int64_t epochMsFor(int64_t pressUs) {
 // Rueckgabe: HTTP-Status oder <=0 bei Netzwerkfehler/Timeout.
 int postTrigger(const Event& e, int64_t ts) {
   String url = baseUrl() + "/api/triggers";
+  String triggerId = String(bootId, HEX) + ":" + String((unsigned long long)e.pressUs);
   String body = String("{\"mac\":\"") + deviceMac + "\",\"ts\":" + String((unsigned long long)ts) +
-                ",\"stopwatch_ms\":null,\"run_id\":null}";
+                ",\"trigger_id\":\"" + triggerId + "\",\"stopwatch_ms\":null,\"run_id\":null}";
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
@@ -273,9 +277,9 @@ int postTrigger(const Event& e, int64_t ts) {
 }
 
 int postAbortRun(const Event& e) {
-  String url = baseUrl() + "/api/abort-run";
-  String requestId = deviceMac + ":" + String((unsigned long long)e.pressUs);
-  String body = String("{\"mac\":\"") + deviceMac + "\",\"request_id\":\"" + requestId + "\"}";
+  String url = baseUrl() + "/api/abort-press";
+  String triggerId = String(bootId, HEX) + ":" + String((unsigned long long)e.pressUs);
+  String body = String("{\"mac\":\"") + deviceMac + "\",\"trigger_id\":\"" + triggerId + "\"}";
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
   http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
@@ -547,14 +551,24 @@ bool deliver(const Event& e) {
   for (int attempt = 1; attempt <= cfg::Net::RETRY_COUNT; attempt++) {
     int code = e.abortRun ? postAbortRun(e) : postTrigger(e, ts);
     if (code == 200) {
+      if (e.abortRun) {
+        portENTER_CRITICAL(&qMux);
+        if (abortPressUs == e.pressUs) abortResult = AbortStatus::CONFIRMED;
+        portEXIT_CRITICAL(&qMux);
+      }
       logLine(e.id, attempt, code, "sent");
       return true;
     }
-    if (code == 409) {  // Duplikat: Server kennt das Event bereits
+    if (code == 409 && !e.abortRun) {  // Duplikat: Server kennt das Event bereits
       logLine(e.id, attempt, code, "sent");
       return true;
     }
     if (code >= 400 && code < 500) {  // Clientfehler: Retry sinnlos
+      if (e.abortRun) {
+        portENTER_CRITICAL(&qMux);
+        if (abortPressUs == e.pressUs) abortResult = AbortStatus::FAILED;
+        portEXIT_CRITICAL(&qMux);
+      }
       logLine(e.id, attempt, code, "dropped");
       return true;
     }
@@ -772,6 +786,7 @@ void displayTask(void*) {
 }  // namespace
 
 void begin() {
+  bootId = esp_random();
   loadCreds();
   WiFi.mode(WIFI_STA);
   // Ohne WLAN-Energiesparen antwortet der Chip sofort statt erst im naechsten Beacon-Intervall
@@ -834,6 +849,7 @@ bool enqueueEvent(int64_t pressUs, bool abortRun) {
   bool dropped = false;
   portENTER_CRITICAL(&qMux);
   if (qCount == cfg::Net::QUEUE_MAX) {  // Drop-Strategie: aeltestes Event verwerfen
+    if (queue[qHead].abortRun && queue[qHead].pressUs == abortPressUs) abortResult = AbortStatus::FAILED;
     qHead = (qHead + 1) % cfg::Net::QUEUE_MAX;
     qCount--;
     dropped = true;
@@ -857,7 +873,24 @@ bool sendTrigger(int64_t pressUs) {
 }
 
 bool sendAbortRun(int64_t pressUs) {
-  return enqueueEvent(pressUs, true);
+  portENTER_CRITICAL(&qMux);
+  abortPressUs = pressUs;
+  abortResult = AbortStatus::PENDING;
+  portEXIT_CRITICAL(&qMux);
+  const bool queued = enqueueEvent(pressUs, true);
+  if (!queued) {
+    portENTER_CRITICAL(&qMux);
+    if (abortPressUs == pressUs) abortResult = AbortStatus::FAILED;
+    portEXIT_CRITICAL(&qMux);
+  }
+  return queued;
+}
+
+AbortStatus abortStatus(int64_t pressUs) {
+  portENTER_CRITICAL(&qMux);
+  AbortStatus result = abortPressUs == pressUs ? abortResult : AbortStatus::NONE;
+  portEXIT_CRITICAL(&qMux);
+  return result;
 }
 
 size_t queued() { return qCount; }

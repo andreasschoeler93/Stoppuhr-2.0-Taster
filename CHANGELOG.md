@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.19.2 | 2026-11-12 | 0.41.11 | Tastendruck und Quittung sofort; Starter-Langdruck nach 5 s mit Warnanzeige und wiederholtem Ton. Abbruch wird dem auslösenden Druck zugeordnet und erst nach Pi-Bestätigung bestätigt. |
 | v0.19.1 | 2026-11-12 | 0.41.6 | Diagnose-Ringpuffer für Start, WLAN, Rollenwechsel, Messfehler und Netzwerkfehler; der Pi übernimmt die letzten 24 Meldungen je Taster. |
 | v0.19.0 | 2026-11-05 | 0.34.0 | Starter mit Zieleinlauf offline: zeigt so viele Uhren wie Bahnen; der erste Druck startet (wird gesendet), jeder weitere stoppt die nächste Uhr. Sind alle gestoppt, ist der nächste Druck der Start des nächsten Laufs. Starter ohne Zieleinlauf bleibt Start/Stopp. |
 | v0.18.0 | 2026-11-05 | 0.33.0 | Ziel-Taster offline: so viele Uhren wie die höchste Bahn im Wettkampf. Der erste Druck startet alle Uhren (zählt nicht als Zieleinlauf und wird nicht gesendet), jeder weitere Druck stoppt die nächste Uhr und wird als Zieleinlauf nachgeliefert. Eine schon laufende Uhr zählt nahtlos weiter. |

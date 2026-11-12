@@ -259,6 +259,23 @@ void drawRange(const netlink::RoleInfo& ri, char letter, const measure::Data& m)
   display::renderBottomBar(bg, letter, m);
 }
 
+void drawAbortNotice(netlink::AbortStatus status, bool red) {
+  if (!display::ready()) return;
+  GFXcanvas16& c = display::canvas();
+  c.fillScreen(red ? cfg::rgb565(180, 0, 0) : cfg::rgb565(0, 130, 0));
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans12pt7b);
+  printCentered("Achtung", 90);
+  printCentered("Startabbruch", 125);
+  c.setFont(&FreeSans9pt7b);
+  const char* text = status == netlink::AbortStatus::NONE ? "5 Sekunden halten"
+                   : status == netlink::AbortStatus::PENDING ? "Warte auf Pi"
+                   : status == netlink::AbortStatus::CONFIRMED ? "Pi hat bestaetigt"
+                   : "Fehler: Pi / Lauf pruefen";
+  printCentered(text, 175);
+  display::flush();
+}
+
 void drawSplash(char letter, const measure::Data& m) {
   if (!display::ready()) return;
 

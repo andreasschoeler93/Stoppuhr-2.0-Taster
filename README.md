@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.19.1)
+# Taster – Firmware (v0.19.2)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -105,8 +105,15 @@ Der Zieleinlauf-Taster zeigt dieselbe Liste wie der Starter (Kopf „Ziel“, vi
 
 ### Starter: Abbruch
 
-Ein Langdruck (2 s) am Starter bricht den laufenden Versuch ab und bereitet eine neue Version desselben Laufs vor (dreimal langes Piepen).
-Die neue Version startet erst nach Ablauf der Stopp-Sperre mit einem kurzen Druck. Bahn-Taster behalten Start/Stopp.
+Alle Drücke werden beim Drücken verarbeitet und durch einen kurzen Ton quittiert, nicht erst beim Loslassen.
+Wird der Starter fünf Sekunden gehalten, fordert er den Abbruch des zu diesem Druck gehörenden Versuchs an:
+Während des Haltens erscheinen „Achtung Startabbruch“ mit rot/grün wechselndem Hintergrund und ein Piepton pro Sekunde.
+Der erste Druck hat schon als Start, Stopp oder Zieleinlauf gewirkt; ein zuvor extern abgerufenes Ergebnis kann nicht
+zurückgeholt werden. Die Anzeige unterscheidet „Warte auf Pi“, Bestätigung und Fehler. Erst die Pi-Bestätigung und
+das anschließende dreimal lange Piepen bestätigen den Abbruch. Offline wird die Anfrage nachgeliefert; geht der
+Puffer verloren oder hat der Pi inzwischen einen anderen Versuch ausgewählt, ist der Abbruch nicht bestätigt.
+Der neue Versuch startet erst nach Ablauf der Stopp-Sperre. Der neue Abbruch benötigt Pi v0.41.11; bei älterem Pi
+wird er als Fehler angezeigt. Deshalb zuerst den Pi aktualisieren.
 
 ### Signaltöne
 

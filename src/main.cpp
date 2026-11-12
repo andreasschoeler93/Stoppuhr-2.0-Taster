@@ -36,6 +36,12 @@ uint16_t localStopRun = 0;
 uint16_t localStopAttempt = 0;
 uint32_t localStopAtMs = 0;
 bool longPressSent = false;
+bool pendingTriggered = false;
+bool pendingStarter = false;
+bool pendingSent = false;
+int64_t abortNoticePressUs = 0;
+uint32_t abortNoticeAtMs = 0;
+netlink::AbortStatus lastAbortStatus = netlink::AbortStatus::NONE;
 uint8_t shownPending = 0;
 int64_t pendingPressUs = 0;
 // Offline-Stoppuhr (Pi nicht erreichbar)
@@ -117,6 +123,7 @@ void loop() {
       if (!netlink::serverOnline()) {
         // Pi nicht erreichbar: Offline-Uhren bedienen (weiter unten), siehe offFin*
         if (finPressN < sizeof(finPress) / sizeof(finPress[0])) finPress[finPressN++] = pressUs;
+        beep::click();
         continue;
       }
       netlink::sendTrigger(pressUs);
@@ -128,12 +135,21 @@ void loop() {
     // Starter mit Zieleinlauf, Pi aus: Druecke bedienen die lokalen Uhren (siehe offFin*)
     while (button::pressed(&pressUs)) {
       if (finPressN < sizeof(finPress) / sizeof(finPress[0])) finPress[finPressN++] = pressUs;
+      beep::click();
+      pendingPressUs = pressUs;
+      pendingButtonPress = true;
+      pendingStarter = true;
+      pendingTriggered = true;
+      longPressSent = false;
     }
-    pendingButtonPress = false;
   } else if (!pendingButtonPress && button::pressed(&pressUs)) {
     pendingPressUs = pressUs;
     pendingButtonPress = true;
+    pendingStarter = netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::STARTER;
+    pendingTriggered = false;
     longPressSent = false;
+    pendingSent = netlink::sendTrigger(pendingPressUs);
+    beep::click();
   }
 
   uint8_t changed = measure::update();
@@ -234,10 +250,8 @@ void loop() {
         offFinCount = 0;
         offStartUs = us;
         if (isStarter) offRun = offNextRun++;
-        beep::click();
       } else if (netlink::sendTrigger(us)) {
         offFinMs[offFinCount++] = (int32_t)((us - offStartUs) / 1000);
-        beep::click();
       }
     }
   }
@@ -246,46 +260,47 @@ void loop() {
   // Bereitschaft nur ohne Rolle; Anzeige wechselt bei jeder Aenderung
   const uint8_t pendingLane = haveRole ? 0 : ri.pendingLane;
   if (pendingButtonPress) {
-    if (!longPressSent && haveRole && ri.role == netlink::RoleInfo::STARTER && button::down() &&
-        esp_timer_get_time() - pendingPressUs >=
-            (int64_t)cfg::Timing::STARTER_LONG_PRESS_MS * 1000) {
-      netlink::sendAbortRun(pendingPressUs);
-      beep::abortRun();
-      longPressSent = true;
-    } else if (!button::down()) {
-      if (!longPressSent) {
-        // Bahn: Stoppzeit sofort selbst berechnen und anzeigen, der Server bestaetigt sie spaeter
-        if (!offline && haveRole && ri.role == netlink::RoleInfo::LANE &&
-            ri.state == netlink::RoleInfo::RUNNING && !localStop) {
-          const uint32_t pressMs = millis() - (uint32_t)((esp_timer_get_time() - pendingPressUs) / 1000);
-          const int32_t ms = ri.elapsedMs + (int32_t)(pressMs - ri.recvMs);
-          if (ms >= 0) {
-            localStop = true;
-            localStopMs = ms;
-            localStopRun = ri.run;
-            localStopAttempt = ri.attempt;
-            localStopAtMs = millis();
-          }
+    if (!pendingTriggered) {
+      // Bahn: Stoppzeit sofort selbst berechnen und anzeigen, der Server bestaetigt sie spaeter
+      if (!offline && haveRole && ri.role == netlink::RoleInfo::LANE &&
+          ri.state == netlink::RoleInfo::RUNNING && !localStop) {
+        const uint32_t pressMs = millis() - (uint32_t)((esp_timer_get_time() - pendingPressUs) / 1000);
+        const int32_t ms = ri.elapsedMs + (int32_t)(pressMs - ri.recvMs);
+        if (ms >= 0) {
+          localStop = true;
+          localStopMs = ms;
+          localStopRun = ri.run;
+          localStopAttempt = ri.attempt;
+          localStopAtMs = millis();
         }
-        const bool sent = netlink::sendTrigger(pendingPressUs);
-        if (offline && timed && sent) {
-          // Erster Druck startet, zweiter stoppt (Start kommt spaeter vom Starter und wird nachberechnet)
-          const int64_t sinceStartMs = (pendingPressUs - offStartUs) / 1000;
-          const bool isStarter = ri.role == netlink::RoleInfo::STARTER;
-          const int64_t minRunMs = isStarter ? cfg::Timing::OFFLINE_STARTER_STOP_MIN_MS
-                                             : cfg::Timing::OFFLINE_STOP_LOCKOUT_MS;
-          if (!offRunning) {
-            offRunning = true;
-            offStartUs = pendingPressUs;
-            offStopMs = -1;
-            if (isStarter) offRun = offNextRun++;
-          } else if (sinceStartMs >= minRunMs) {
-            offRunning = false;
-            offStopMs = (int32_t)sinceStartMs;
-          }
-        }
-        beep::click();
       }
+      if (offline && timed && pendingSent) {
+        // Erster Druck startet, zweiter stoppt (Start kommt spaeter vom Starter und wird nachberechnet)
+        const int64_t sinceStartMs = (pendingPressUs - offStartUs) / 1000;
+        const bool isStarter = ri.role == netlink::RoleInfo::STARTER;
+        const int64_t minRunMs = isStarter ? cfg::Timing::OFFLINE_STARTER_STOP_MIN_MS
+                                           : cfg::Timing::OFFLINE_STOP_LOCKOUT_MS;
+        if (!offRunning) {
+          offRunning = true;
+          offStartUs = pendingPressUs;
+          offStopMs = -1;
+          if (isStarter) offRun = offNextRun++;
+        } else if (sinceStartMs >= minRunMs) {
+          offRunning = false;
+          offStopMs = (int32_t)sinceStartMs;
+        }
+      }
+      pendingTriggered = true;
+    }
+    if (!longPressSent && pendingStarter && button::down() &&
+        esp_timer_get_time() - pendingPressUs >= (int64_t)cfg::Timing::STARTER_LONG_PRESS_MS * 1000) {
+      abortNoticePressUs = pendingPressUs;
+      abortNoticeAtMs = millis();
+      lastAbortStatus = netlink::AbortStatus::PENDING;
+      if (!netlink::sendAbortRun(pendingPressUs)) lastAbortStatus = netlink::AbortStatus::FAILED;
+      longPressSent = true;
+    }
+    if (!pendingStarter || !button::down()) {
       pendingButtonPress = false;
     }
   }
@@ -362,6 +377,46 @@ void loop() {
   }
   const bool offChanged = offKey != lastOffKey;
   lastOffKey = offKey;
+
+  static bool abortScreenShown = false;
+  static bool lastAbortRed = false;
+  static netlink::AbortStatus drawnAbortStatus = netlink::AbortStatus::NONE;
+  static uint32_t lastHoldSecond = 0;
+  const bool holdingStarter = pendingButtonPress && pendingStarter && button::down();
+  const uint32_t heldSeconds = holdingStarter
+      ? (uint32_t)((esp_timer_get_time() - pendingPressUs) / 1000000) : 0;
+  if (holdingStarter && heldSeconds && heldSeconds != lastHoldSecond) {
+    lastHoldSecond = heldSeconds;
+    beep::click();
+  }
+  if (!holdingStarter) lastHoldSecond = 0;
+  if (abortNoticePressUs) {
+    const netlink::AbortStatus status = netlink::abortStatus(abortNoticePressUs);
+    if (status != netlink::AbortStatus::NONE && status != lastAbortStatus) {
+      lastAbortStatus = status;
+      abortNoticeAtMs = millis();
+      if (status == netlink::AbortStatus::CONFIRMED) beep::abortRun();
+    }
+  }
+  const bool showAbortNotice = abortNoticePressUs && millis() - abortNoticeAtMs < 4000;
+  if (holdingStarter || showAbortNotice) {
+    const netlink::AbortStatus shownStatus = holdingStarter && !longPressSent
+                                                ? netlink::AbortStatus::NONE : lastAbortStatus;
+    const bool red = (millis() / 500) % 2 == 0;
+    if (!abortScreenShown || red != lastAbortRed || shownStatus != drawnAbortStatus) {
+      screens::drawAbortNotice(shownStatus, red);
+      lastAbortRed = red;
+      drawnAbortStatus = shownStatus;
+    }
+    abortScreenShown = true;
+    delay(5);
+    return;
+  }
+  if (abortScreenShown) {
+    abortScreenShown = false;
+    uiMode = UiMode::SPLASH;
+    modeStartedMs = millis() - cfg::Timing::SPLASH_MS;
+  }
 
   if (uiMode == UiMode::SPLASH) {
     if (millis() - modeStartedMs >= cfg::Timing::SPLASH_MS) {

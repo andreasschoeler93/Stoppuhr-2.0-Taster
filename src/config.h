@@ -37,7 +37,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 19
-#define FW_VERSION_PATCH 1
+#define FW_VERSION_PATCH 2
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -120,7 +120,7 @@ struct Layout {
 
 struct Timing {
   static constexpr uint32_t DEBOUNCE_MS = 40;
-  static constexpr uint32_t STARTER_LONG_PRESS_MS = 2000;
+  static constexpr uint32_t STARTER_LONG_PRESS_MS = 5000;
   // So lange zeigt die Bahn die selbst gemessene Stoppzeit, bis der Server sie bestaetigt
   static constexpr uint32_t LOCAL_STOP_HOLD_MS = 2500;
   static constexpr uint32_t SPLASH_MS = 5000;
