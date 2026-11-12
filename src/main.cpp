@@ -16,6 +16,7 @@
 #include "display.h"
 #include "measurements.h"
 #include "netlink.h"
+#include "press_gate.h"
 #include "screens.h"
 
 namespace {
@@ -44,6 +45,7 @@ uint32_t abortNoticeAtMs = 0;
 netlink::AbortStatus lastAbortStatus = netlink::AbortStatus::NONE;
 uint8_t shownPending = 0;
 int64_t pendingPressUs = 0;
+PressGate pressGate;
 // Offline-Stoppuhr (Pi nicht erreichbar)
 bool offActive = false;
 bool offRunning = false;
@@ -122,19 +124,28 @@ void loop() {
     while (button::pressed(&pressUs)) {
       if (!netlink::serverOnline()) {
         // Pi nicht erreichbar: Offline-Uhren bedienen (weiter unten), siehe offFin*
-        if (finPressN < sizeof(finPress) / sizeof(finPress[0])) finPress[finPressN++] = pressUs;
-        beep::click();
+        if (finPressN >= sizeof(finPress) / sizeof(finPress[0])) {
+          device_log::addf("finish press buffer full");
+        } else if (pressGate.accept(pressUs, cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS)) {
+          finPress[finPressN++] = pressUs;
+          beep::click();
+        }
         continue;
       }
-      netlink::sendTrigger(pressUs);
-      beep::click();
+      if (pressGate.accept(pressUs, cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS) &&
+          netlink::sendTrigger(pressUs)) beep::click();
     }
     pendingButtonPress = false;
   } else if (netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::STARTER &&
              finishRole.combo && !netlink::serverOnline()) {
     // Starter mit Zieleinlauf, Pi aus: Druecke bedienen die lokalen Uhren (siehe offFin*)
     while (button::pressed(&pressUs)) {
-      if (finPressN < sizeof(finPress) / sizeof(finPress[0])) finPress[finPressN++] = pressUs;
+      if (finPressN >= sizeof(finPress) / sizeof(finPress[0])) {
+        device_log::addf("finish press buffer full");
+        continue;
+      }
+      if (!pressGate.accept(pressUs, cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS)) continue;
+      finPress[finPressN++] = pressUs;
       beep::click();
       pendingPressUs = pressUs;
       pendingButtonPress = true;
@@ -143,13 +154,17 @@ void loop() {
       longPressSent = false;
     }
   } else if (!pendingButtonPress && button::pressed(&pressUs)) {
-    pendingPressUs = pressUs;
-    pendingButtonPress = true;
-    pendingStarter = netlink::roleInfo(finishRole) && finishRole.role == netlink::RoleInfo::STARTER;
-    pendingTriggered = false;
-    longPressSent = false;
-    pendingSent = netlink::sendTrigger(pendingPressUs);
-    beep::click();
+    const bool combo = finishRole.role == netlink::RoleInfo::STARTER && finishRole.combo;
+    const uint32_t interval = combo ? cfg::Net::FINISH_TRIGGER_MIN_INTERVAL_MS : cfg::Net::TRIGGER_MIN_INTERVAL_MS;
+    if (pressGate.accept(pressUs, interval) && netlink::sendTrigger(pressUs)) {
+      pendingPressUs = pressUs;
+      pendingButtonPress = true;
+      pendingStarter = finishRole.role == netlink::RoleInfo::STARTER;
+      pendingTriggered = false;
+      longPressSent = false;
+      pendingSent = true;
+      beep::click();
+    }
   }
 
   uint8_t changed = measure::update();

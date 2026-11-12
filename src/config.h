@@ -37,7 +37,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 19
-#define FW_VERSION_PATCH 2
+#define FW_VERSION_PATCH 3
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -179,7 +179,8 @@ struct Net {
   static constexpr uint32_t RETRY_BACKOFF_MS = 100;
   static constexpr bool ENABLE_OFFLINE_QUEUE = true;
   static constexpr size_t QUEUE_MAX = 32;
-  static constexpr uint32_t TRIGGER_MIN_INTERVAL_MS = 300;
+  static constexpr uint32_t TRIGGER_MIN_INTERVAL_MS = 1000;
+  static constexpr uint32_t FINISH_TRIGGER_MIN_INTERVAL_MS = 300;
   static constexpr uint32_t FLUSH_RETRY_MS = 500;
   static constexpr uint32_t VITALS_INTERVAL_MS = 10000;
   // Bei getrenntem WLAN alle 5 s einen neuen Verbindungsversuch starten.

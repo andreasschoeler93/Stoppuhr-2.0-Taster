@@ -8,7 +8,7 @@ namespace netlink {
 
 void begin();
 // Legt einen Trigger in die Warteschlange (nicht blockierend).
-// Gibt false zurueck, wenn er durch Entprellung verworfen wurde.
+// Gibt false zurueck, wenn der Trigger nicht in die Warteschlange aufgenommen wurde.
 // pressUs: esp_timer-Zeit (Mikrosekunden) des Tastendrucks.
 bool sendTrigger(int64_t pressUs);
 // Legt die Anforderung zum Abbrechen und Wiederholen des aktuellen Laufs in die Warteschlange.

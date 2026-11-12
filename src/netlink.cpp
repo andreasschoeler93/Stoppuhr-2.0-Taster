@@ -31,8 +31,6 @@ uint32_t counter = 0;
 uint32_t bootId = 0;
 int64_t abortPressUs = 0;
 AbortStatus abortResult = AbortStatus::NONE;
-uint32_t lastTriggerMs = 0;
-bool haveTrigger = false;
 portMUX_TYPE qMux = portMUX_INITIALIZER_UNLOCKED;
 String deviceMac;
 String deviceName;
@@ -865,10 +863,6 @@ bool enqueueEvent(int64_t pressUs, bool abortRun) {
 }
 
 bool sendTrigger(int64_t pressUs) {
-  uint32_t now = millis();
-  if (haveTrigger && now - lastTriggerMs < cfg::Net::TRIGGER_MIN_INTERVAL_MS) return false;
-  haveTrigger = true;
-  lastTriggerMs = now;
   return enqueueEvent(pressUs, false);
 }
 
