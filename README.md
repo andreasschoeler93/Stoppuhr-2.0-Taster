@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.19.4)
+# Taster – Firmware (v0.19.5)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -136,7 +136,7 @@ Nur internes WLAN, keine Cloud. Das Senden läuft in einem eigenen Task (`src/ne
 | `POST /api/triggers` | Tastendruck: `{"mac":"AA:BB:CC:DD:EE:01","ts":1761290000123,"stopwatch_ms":null,"run_id":null}`; Antwort `{"ok":true,"received_at":…,"event_id":"…"}` |
 | `POST /api/abort-run` | Langdruck des Starters: `{"mac":"…","request_id":"…"}` |
 | `POST /api/taster` | Anmeldung `{"mac","name"}`, alle 5 s bis 200, danach alle 60 s; Antwort enthält den Buchstaben `letter` (A–J) |
-| `POST /api/vitals` | alle 10 s: `{"mac","battery","temp","humidity","vbat","rssi","ssid","fw","uptime_s","clock_ms","wv"}`; `ts` setzt der Server |
+| `POST /api/vitals` | alle 10 s: `{"mac","battery","temp","humidity","vbat","rssi","ssid","fw","uptime_s","clock_ms","clock_synced","clock_sync_age_ms","wv"}`; `ts` setzt der Server |
 | `GET /api/display?mac=…` | Rolle und Anzeigedaten (alle 200 ms mit Rolle, sonst 1 s); enthält auch Update- und WLAN-Angebote |
 | `GET /api/firmware/download?mac=…`, `POST /api/ota-status` | Update-Download und Fehlermeldung |
 
@@ -153,8 +153,9 @@ Der Header `X-Api-Key` wird nur gesendet, wenn ein Schlüssel konfiguriert ist. 
 ### Zeitgenauigkeit
 
 - Der Zeitstempel stammt aus einem Interrupt auf der fallenden Flanke (`esp_timer`, µs), nicht aus `loop()`.
-- SNTP gleicht alle 30 s mit dem Pi ab. Der Pi muss ein NTP-Server sein (chrony, `allow` für das Taster-WLAN) und der Server dieselbe Uhr nutzen.
-- Aus `clock_ms` bestimmt der Server den Uhrversatz und gleicht nur grobe Abweichungen (> 250 ms) aus; kleinere sind Netzlatenz.
+- SNTP gleicht alle 30 s mit dem Pi ab. Nach jeder WLAN-Unterbrechung wird der Synchronisationsstatus zurückgesetzt und SNTP neu gestartet. Der Pi muss ein NTP-Server sein (chrony, `allow` für das Taster-WLAN) und dieselbe Zeitquelle nutzen.
+- `clock_synced` und `clock_sync_age_ms` zeigen, ob seit der letzten WLAN-Verbindung eine SNTP-Synchronisierung erfolgreich war und wie lange sie zurückliegt. Diese Bereitschaftsanzeige garantiert keine Genauigkeit von 5 ms; Standard-WLAN-SNTP kann das nicht pauschal gewährleisten.
+- Tastendrücke verwenden den SNTP-basierten Epoch-Zeitstempel, der beim Tastendruck erfasst wird. Der Pi korrigiert ihn nicht anhand des Einweg-Versatzes in Vitalmeldungen, da dieser auch WLAN-Laufzeit enthält.
 
 ### Konfiguration (`cfg::Net` in `src/config.h`)
 

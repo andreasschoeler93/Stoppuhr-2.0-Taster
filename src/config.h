@@ -37,7 +37,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 19
-#define FW_VERSION_PATCH 4
+#define FW_VERSION_PATCH 5
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -163,6 +163,7 @@ struct Net {
   static constexpr uint16_t PI_PORT = 1999;
   static constexpr const char* NTP_SERVER = SECRET_NTP_SERVER;
   static constexpr uint32_t NTP_SYNC_INTERVAL_MS = 30000;
+  static constexpr uint32_t NTP_SYNC_MAX_AGE_MS = 60000;
   // Leer: MAC des ESP32 wird verwendet
   static constexpr const char* DEVICE_MAC = "";
   // Anzeigename im Server; leer = "T-" + letzte 3 MAC-Bytes

@@ -47,6 +47,8 @@ volatile uint32_t piIp = 0;
 volatile bool pollNow = false;
 volatile uint32_t lastServerOkMs = 0;
 volatile bool reregisterNow = false;
+volatile uint32_t lastSntpSyncMs = 0;
+volatile bool hasSntpSync = false;
 
 // Firmware-Update vom Pi (OTA)
 struct OtaOffer {
@@ -86,6 +88,11 @@ portMUX_TYPE pendMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t ackVer = 0;  // zuletzt empfangene WLAN-Fassung, wird als "wv" gemeldet
 
 void jsonStr(const String& s, const char* key, char* out, size_t size);
+
+void onSntpTimeSync(struct timeval*) {
+  lastSntpSyncMs = millis();
+  hasSntpSync = true;
+}
 
 uint32_t fnv(uint32_t h, const char* s) {
   for (; *s; ++s) h = (h ^ (uint8_t)*s) * 16777619u;
@@ -307,16 +314,20 @@ void postVitals() {
   }
   // Feldnamen wie im Stoppuhr-Backend (battery = Prozent, temp, humidity);
   // ts fehlt absichtlich, der Server setzt dann die Empfangszeit.
-  // clock_ms (Uhr des Tasters, nur wenn synchron) dient dem Server, den Uhrversatz auszugleichen.
+  // clock_ms stammt aus der SNTP-Uhr. Der Einweg-Versatz zum Pi ist nur eine Diagnosemessung.
   char clock[40] = "";
   int64_t nowEpoch = epochMsFor(esp_timer_get_time());
   if (nowEpoch != 0) snprintf(clock, sizeof(clock), ",\"clock_ms\":%llu", (unsigned long long)nowEpoch);
+  const uint32_t syncAgeMs = millis() - lastSntpSyncMs;
+  const bool clockSynced = hasSntpSync && syncAgeMs <= cfg::Net::NTP_SYNC_MAX_AGE_MS;
+  const long reportedSyncAgeMs = hasSntpSync ? static_cast<long>(syncAgeMs) : -1;
   const int baseLength = snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
-           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s,\"logs\":",
+           "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s,"
+           "\"clock_synced\":%s,\"clock_sync_age_ms\":%ld,\"logs\":",
            deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
            WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000),
-           (unsigned long)ackVer, clock);
+           (unsigned long)ackVer, clock, clockSynced ? "true" : "false", reportedSyncAgeMs);
   if (baseLength < 0 || static_cast<size_t>(baseLength) >= sizeof(body)) {
     device_log::addf("vitals payload prefix too large");
     return;
@@ -792,6 +803,13 @@ void begin() {
   WiFi.setAutoReconnect(true);
   // Auch WPA/WPA2-Mischbetrieb akzeptieren (sonst Abbruch mit Grund 211)
   WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
+  WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) {
+    hasSntpSync = false;
+  }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) {
+    hasSntpSync = false;
+    esp_sntp_restart();
+  }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
 #if DBG
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
     device_log::addf("WiFi disconnected reason=%u", info.wifi_sta_disconnected.reason);
@@ -834,6 +852,7 @@ void begin() {
   WiFi.begin(creds.ssid, creds.pass);
   // Haeufiger abgleichen als der Standard (1 h), damit die Quarz-Drift klein bleibt
   sntp_set_sync_interval(cfg::Net::NTP_SYNC_INTERVAL_MS);
+  sntp_set_time_sync_notification_cb(onSntpTimeSync);
   configTime(0, 0, creds.ntp);
   xTaskCreate(netTask, "netlink", 8192, nullptr, 1, nullptr);
   xTaskCreate(displayTask, "display", 8192, nullptr, 1, nullptr);
