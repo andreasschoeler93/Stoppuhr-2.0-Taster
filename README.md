@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.19.6)
+# Taster – Firmware (v0.19.7)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -138,7 +138,7 @@ Nur internes WLAN, keine Cloud. Das Senden läuft in einem eigenen Task (`src/ne
 | `POST /api/abort-run` | Langdruck des Starters: `{"mac":"…","request_id":"…"}` |
 | `POST /api/taster` | Anmeldung `{"mac","name"}`, alle 5 s bis 200, danach alle 60 s; Antwort enthält den Buchstaben `letter` (A–J) |
 | `POST /api/vitals` | alle 10 s: `{"mac","battery","temp","humidity","vbat","rssi","ssid","fw","uptime_s","clock_ms","clock_synced","clock_sync_age_ms","wv"}`; `ts` setzt der Server |
-| `GET /api/display?mac=…` | Rolle und Anzeigedaten (alle 200 ms mit Rolle, sonst 1 s); enthält auch Update- und WLAN-Angebote |
+| `GET /api/display?mac=…` | Rolle und Anzeigedaten (mit Rolle alle 2 s, sonst alle 1 s); enthält auch Update- und WLAN-Angebote |
 | `GET /api/firmware/download?mac=…`, `POST /api/ota-status` | Update-Download und Fehlermeldung |
 
 Der Header `X-Api-Key` wird nur gesendet, wenn ein Schlüssel konfiguriert ist. Der Name des Tasters entsteht aus den letzten drei MAC-Bytes

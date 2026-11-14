@@ -37,7 +37,7 @@
 // Versionsschema: MAJOR.MINOR.PATCH (siehe README)
 #define FW_VERSION_MAJOR 0
 #define FW_VERSION_MINOR 19
-#define FW_VERSION_PATCH 6
+#define FW_VERSION_PATCH 7
 #define FW_STR_(x) #x
 #define FW_STR(x) FW_STR_(x)
 #define FW_VERSION "v" FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
@@ -172,8 +172,8 @@ struct Net {
   static constexpr const char* DEVICE_NAME = "";
   static constexpr uint32_t REGISTER_RETRY_MS = 5000;
   static constexpr uint32_t REREGISTER_MS = 60000;
-  // Abfrage der Anzeigedaten (GET /api/display): mit Rolle schnell, ohne Rolle langsam
-  static constexpr uint32_t DISPLAY_POLL_MS = 200;
+  // Abfrage der Anzeigedaten (GET /api/display): mit Rolle alle 2 s, ohne Rolle alle 1 s
+  static constexpr uint32_t DISPLAY_POLL_MS = 2000;
   static constexpr uint32_t DISPLAY_POLL_IDLE_MS = 1000;
   // Leer: kein X-Api-Key-Header
   static constexpr const char* API_KEY = SECRET_API_KEY;
