@@ -41,6 +41,8 @@ volatile uint8_t lowBatteryPct = cfg::Timing::LOW_BATTERY_PERCENT;
 volatile uint16_t lowBatteryMin = cfg::Timing::LOW_BATTERY_SHUTDOWN_MS / 60000UL;
 RoleInfo roleState;
 bool roleValid = false;
+bool roleLossPending = false;
+uint32_t roleNoneSinceMs = 0;
 portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
 // Pi-Adresse einmal aufloesen und merken: ein Namensabruf pro Anfrage kostete teils Sekunden.
 volatile uint32_t piIp = 0;
@@ -528,6 +530,19 @@ uint8_t pollDisplay() {
   }
 
   portENTER_CRITICAL(&roleMux);
+  if (r.role == RoleInfo::NONE && roleValid && roleState.role != RoleInfo::NONE) {
+    if (!roleLossPending) {
+      roleLossPending = true;
+      roleNoneSinceMs = millis();
+    }
+    if (millis() - roleNoneSinceMs < cfg::Timing::ROLE_LOSS_GRACE_MS) {
+      const uint8_t heldRole = roleState.role;
+      portEXIT_CRITICAL(&roleMux);
+      return heldRole;
+    }
+  } else {
+    roleLossPending = false;
+  }
   bool same = roleValid && r.role == roleState.role && r.state == roleState.state &&
               r.pendingLane == roleState.pendingLane &&
               r.lane == roleState.lane && r.run == roleState.run && r.attempt == roleState.attempt &&

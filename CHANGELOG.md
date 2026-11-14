@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.19.6 | 2026-11-14 | 0.41.20 | Kurze Antworten ohne Rolle werden bis zu einer Sekunde abgefangen, damit die Tasteranzeige nicht kurz zur Buchstabenansicht wechselt. |
 | v0.19.5 | 2026-11-14 | 0.41.17 | Meldet erfolgreiche SNTP-Synchronisierung und deren Alter; setzt den Status bei WLAN-Wechsel zurück und startet SNTP neu. Zeitstempel werden vom Pi nicht mehr anhand der Vitaldaten-Empfangszeit korrigiert. |
 | v0.19.4 | 2026-11-12 | 0.41.11 | Mindestabstand für alle Rollen 300 ms. Starter-Abbruchwarnung erst nach mehr als einer Sekunde Halten; online zeigt die Bahn nur vom Pi bestätigte Stoppzeiten statt einer möglicherweise falschen lokalen Stoppzeit. |
 | v0.19.3 | 2026-11-12 | 0.41.11 | Tastendrücke: 1 s Mindestabstand für Bahn und normalen Starter, 300 ms für Zieleinlauf und kombinierte Starter-/Zieleinlaufrolle; verworfene Drücke piepen nicht. |
