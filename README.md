@@ -1,8 +1,9 @@
-# Taster – Firmware (v0.19.7)
+# Taster – Firmware (v0.19.8)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
 Kurze Antworten ohne erkannte Rolle werden eine Sekunde lang abgefangen, damit das Display nicht kurz auf die Buchstabenansicht springt.
+Der Starter hält seine Anzeigeabfrage kurz offen und erhält Änderungen der gestoppten Bahnen sofort; ohne Unterstützung am Pi oder bei Verbindungsfehlern greift die normale Abfrage. Die Laufzeitmessung bleibt davon unberührt.
 
 Versionsverlauf: [CHANGELOG.md](CHANGELOG.md).
 

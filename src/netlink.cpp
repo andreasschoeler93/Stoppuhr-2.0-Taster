@@ -48,6 +48,8 @@ portMUX_TYPE roleMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t piIp = 0;
 volatile bool pollNow = false;
 volatile uint32_t lastServerOkMs = 0;
+char displaySeq[48] = "";
+bool displayPollFailed = false;
 volatile bool reregisterNow = false;
 volatile uint32_t lastSntpSyncMs = 0;
 volatile bool hasSntpSync = false;
@@ -434,17 +436,39 @@ void jsonStr(const String& s, const char* key, char* out, size_t size) {
 
 // Holt Rolle und Anzeigedaten (GET /api/display?mac=...). Gibt die aktuelle Rolle zurueck.
 uint8_t pollDisplay() {
-  if (WiFi.status() != WL_CONNECTED) return RoleInfo::NONE;
+  if (WiFi.status() != WL_CONNECTED) {
+    displayPollFailed = true;
+    return RoleInfo::NONE;
+  }
+  char since[sizeof(displaySeq)];
+  uint8_t knownRole;
+  portENTER_CRITICAL(&roleMux);
+  knownRole = roleState.role;
+  strlcpy(since, displaySeq, sizeof(since));
+  portEXIT_CRITICAL(&roleMux);
+  const bool longPoll = knownRole == RoleInfo::STARTER && since[0] != '\0';
   HTTPClient http;
   http.setConnectTimeout(cfg::Net::HTTP_TIMEOUT_MS);
-  http.setTimeout(cfg::Net::HTTP_TIMEOUT_MS);
-  if (!http.begin(baseUrl() + "/api/display?mac=" + deviceMac)) return roleState.role;
+  http.setTimeout(longPoll ? cfg::Net::DISPLAY_LONG_POLL_HTTP_TIMEOUT_MS
+                           : cfg::Net::HTTP_TIMEOUT_MS);
+  String url = baseUrl() + "/api/display?mac=" + deviceMac;
+  if (longPoll) {
+    url += "&wait_ms=" + String(cfg::Net::DISPLAY_LONG_POLL_WAIT_MS) + "&since=" + since;
+  }
+  if (!http.begin(url)) {
+    displayPollFailed = true;
+    return roleState.role;
+  }
   if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.GET();
   String body = code == 200 ? http.getString() : String();
   http.end();
   forgetIp(code);
-  if (code != 200) return roleState.role;
+  if (code != 200) {
+    displayPollFailed = true;
+    return roleState.role;
+  }
+  displayPollFailed = false;
   lastServerOkMs = millis() | 1;  // nie 0: 0 heisst "noch keine Antwort"
   if (jsonBool(body, "shutdown")) {
     device_log::addf("shutdown request received");
@@ -479,6 +503,7 @@ uint8_t pollDisplay() {
                                                   : (uint8_t)atoi(pendingText);
   r.run = (uint16_t)jsonInt(body, "run", 0);
   r.attempt = (uint16_t)jsonInt(body, "attempt", 1);
+  jsonStr(body, "state_seq", displaySeq, sizeof(displaySeq));
   r.elapsedMs = jsonInt(body, "elapsed_ms", 0);
   r.timeMs = jsonInt(body, "time_ms", -1);
   r.lastMs = jsonInt(body, "last_ms", -1);
@@ -797,7 +822,10 @@ void displayTask(void*) {
   uint32_t lastPollMs = 0;
   uint8_t role = RoleInfo::NONE;
   for (;;) {
-    uint32_t interval = role != RoleInfo::NONE ? cfg::Net::DISPLAY_POLL_MS : cfg::Net::DISPLAY_POLL_IDLE_MS;
+    uint32_t interval = role == RoleInfo::STARTER && displaySeq[0] && !displayPollFailed
+                            ? cfg::Net::DISPLAY_LONG_POLL_RETRY_MS
+                            : role != RoleInfo::NONE ? cfg::Net::DISPLAY_POLL_MS
+                                                     : cfg::Net::DISPLAY_POLL_IDLE_MS;
     if (pollNow || millis() - lastPollMs >= interval) {
       pollNow = false;
       lastPollMs = millis();
