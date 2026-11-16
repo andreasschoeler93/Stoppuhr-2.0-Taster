@@ -4,6 +4,7 @@
 namespace beep {
 
 void begin();
+void setNormalSounds(bool enabled);
 void click();
 // Dumpfer, tieferer Ton (Signal vom Server)
 void dull();

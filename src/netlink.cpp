@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "beep.h"
 #include "button.h"
 #include "device_log.h"
 #include "measurements.h"
@@ -305,6 +306,8 @@ int postAbortRun(const Event& e) {
   return code;
 }
 
+const char* jsonValue(const String& s, const char* key);
+
 // Vitaldaten (Messwerte) senden. Fehlschlaege werden verworfen, der naechste Wert kommt bald.
 void postVitals() {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -353,6 +356,16 @@ void postVitals() {
   http.addHeader("Content-Type", "application/json");
   if (creds.key[0]) http.addHeader("X-Api-Key", creds.key);
   int code = http.POST(body);
+  if (code == 200) {
+    const String response = http.getString();
+    const char* sounds = jsonValue(response, "taster_sounds");
+    if (sounds && (sounds[0] == '0' || sounds[0] == '1') &&
+        (sounds[1] == ',' || sounds[1] == '}' || sounds[1] == ' ')) {
+      beep::setNormalSounds(sounds[0] == '1');
+    } else if (sounds) {
+      device_log::addf("invalid taster sound setting in vitals response");
+    }
+  }
   http.end();
   if (code != 200) device_log::addf("vitals upload failed http=%d", code);
 #if DBG

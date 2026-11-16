@@ -1,5 +1,6 @@
 #include "beep.h"
 
+#include <atomic>
 #include "config.h"
 
 namespace beep {
@@ -18,6 +19,7 @@ constexpr uint16_t FREQ_ABORT = 2400;
 constexpr uint16_t DUR_ABORT_MS = 450;
 constexpr uint16_t GAP_ABORT_MS = 200;
 bool ok = false;
+std::atomic<bool> normalSounds{true};
 uint32_t offAt = 0;
 uint8_t abortLeft = 0;      // noch zu spielende Toene
 uint32_t abortNextAt = 0;   // Start des naechsten Tons
@@ -43,9 +45,11 @@ void begin() {
 #endif
 }
 
-void click() { play(FREQ_CLICK, DUR_CLICK_MS); }
+void setNormalSounds(bool enabled) { normalSounds.store(enabled); }
 
-void dull() { play(FREQ_DULL, DUR_DULL_MS); }
+void click() { if (normalSounds.load()) play(FREQ_CLICK, DUR_CLICK_MS); }
+
+void dull() { if (normalSounds.load()) play(FREQ_DULL, DUR_DULL_MS); }
 
 void lowBattery() { play(FREQ_LOW_BATTERY, DUR_LOW_BATTERY_MS); }
 

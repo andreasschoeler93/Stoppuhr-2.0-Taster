@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.20.0)
+# Taster – Firmware (v0.21.0)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -66,6 +66,13 @@ Weboberfläche des Pi → Einstellungen → Taster-Firmware → Version wählen 
   ein Zurück auf eine ältere Version geht nur per USB.
 
 ## WLAN
+
+Ab v0.21.0 übernimmt der Taster die Einstellung für Bedien- und Bestätigungstöne aus der
+Antwort auf seine regelmäßige Vitalmeldung. Bei funktionierender Verbindung erfolgt dies
+normalerweise innerhalb von 30 Sekunden; offline bleibt bis zur nächsten erfolgreichen
+Meldung der zuletzt empfangene Zustand erhalten. Akku-, Funk-, Abbruch- und Ereigniswarnungen
+bleiben hörbar. Nach Wettkampfende schaltet der Pi die normalen Töne wieder ein; ältere
+Pi-Versionen ohne diese Einstellung lassen die Töne beim Start eingeschaltet.
 
 ### Zwei Netze (Koffer und Bad, ab v0.10.0)
 
