@@ -4,12 +4,14 @@
 #include <Adafruit_AHTX0.h>
 
 #include "config.h"
+#include "battery_median.h"
 #include "device_log.h"
 
 namespace measure {
 namespace {
 
 Data g;
+BatteryMedian batteryMedian;
 Adafruit_AHTX0 aht;
 uint8_t ahtFail = 0;
 uint32_t lastAhtMs = 0;
@@ -113,7 +115,9 @@ uint8_t pollBattery() {
   BatteryReading reading = readBatteryVoltage();
   float newVbat = reading.valid ? reading.batteryVoltage : NAN;
   uint8_t newLevel = vbatToLevel0to4(newVbat);
-  uint8_t newPercent = vbatToPercent(newVbat);
+  uint8_t rawPercent = vbatToPercent(newVbat);
+  if (!reading.valid) batteryMedian.clear();
+  uint8_t newPercent = reading.valid ? batteryMedian.add(rawPercent) : rawPercent;
   bool changed = isfinite(newVbat) != isfinite(g.vbat)
     || newPercent != g.vbatPercent
     || newLevel != g.vbatLevel;
@@ -123,6 +127,7 @@ uint8_t pollBattery() {
   g.vbat = newVbat;
   g.vbatLevel = newLevel;
   g.vbatPercent = newPercent;
+  g.vbatPercentRaw = rawPercent;
   g.vbatCalc = reading.batteryVoltage;
   g.rawAverage = reading.rawAverage;
   g.adcVoltage = reading.adcVoltage;
@@ -141,7 +146,8 @@ uint8_t pollBattery() {
     reading.batteryVoltage,
     reading.valid ? "OK" : "OUT_OF_RANGE");
   if (reading.valid) {
-    Serial.printf(" level=%u percent=%u%%\n", g.vbatLevel, g.vbatPercent);
+    Serial.printf(" level=%u percent=%u%% raw_percent=%u%%\n",
+                  g.vbatLevel, g.vbatPercent, g.vbatPercentRaw);
   } else {
     Serial.println();
   }
@@ -270,7 +276,7 @@ uint8_t updateBatteryWarning(uint8_t warningPercent) {
   }
 
   const bool wasAtOrBelowThreshold = batteryAtOrBelowThreshold;
-  batteryAtOrBelowThreshold = g.vbatPercent <= warningPercent;
+  batteryAtOrBelowThreshold = g.vbatPercentRaw <= warningPercent;
 
   if (!batteryWarningOn) {
     if (!batteryAtOrBelowThreshold) {
@@ -303,7 +309,7 @@ uint8_t updateBatteryWarning(uint8_t warningPercent) {
   lastLowBatterySampleMs = now;
   const uint16_t recoveryPercent = (uint16_t)warningPercent
     + cfg::Timing::LOW_BATTERY_RECOVERY_MARGIN_PERCENT;
-  if (g.vbatPercent >= recoveryPercent) {
+  if (g.vbatPercentRaw >= recoveryPercent) {
     if (++batteryRecoverySamples >= cfg::Timing::LOW_BATTERY_RECOVERY_SAMPLES) {
       batteryWarningOn = false;
       batteryRecoverySamples = 0;

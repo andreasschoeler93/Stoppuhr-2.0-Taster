@@ -26,6 +26,9 @@ jobs:
       - name: Firmware bauen
         run: pio run -e seeed_xiao_esp32s3
 
+      - name: Akku-Filter testen
+        run: ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-g++ -std=c++17 -fsyntax-only test/test_battery_median.cpp
+
       - uses: actions/upload-artifact@v4
         with:
           name: firmware

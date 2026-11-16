@@ -19,6 +19,7 @@ struct Data {
   float vbatCalc = 0;  // immer die errechnete Spannung (zum Gegenmessen)
   uint8_t vbatLevel = 0;  // 0..4 fuer das Akku-Icon
   uint8_t vbatPercent = 0;
+  uint8_t vbatPercentRaw = 0;
   uint32_t vbatSampleId = 0;
   uint32_t rawAverage = 0;
   float adcVoltage = 0;

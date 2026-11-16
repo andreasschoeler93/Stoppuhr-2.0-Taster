@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.22.0)
+# Taster – Firmware (v0.22.1)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -13,6 +13,7 @@ Seeed XIAO ESP32-S3 mit ST7789-Display, AHT20, Taster, Piezo-Buzzer und schaltba
 Die verbindliche Pinbelegung steht in [`docs/Programmier_Informationen`](docs/Programmier_Informationen).
 
 Die Akkuspannung wird aus acht gemittelten ADC-Messungen mit dem Faktor `2.382` berechnet, der Prozentwert ist eine Schätzung aus der Zellspannung.
+Ab v0.22.1 ist der angezeigte und an den Pi gemeldete Prozentwert der Median der letzten fünf gültigen Messungen (alle fünf Sekunden); während der ersten Messungen wird der Median der vorhandenen Werte verwendet. Nach einer ungültigen Messung beginnt der Filter neu. Spannung und Akkusymbol bleiben ungeglättet. Warnung und Abschaltung des Tasters verwenden weiterhin den ungeglätteten Prozentwert; für die unverzögerte Prozentwarnung auf dem Pi ist mindestens Pi v0.44.3 nötig. Deshalb zuerst beide Pis und danach die Taster aktualisieren. Die Glättung behebt keine tatsächlichen Spannungseinbrüche.
 Der Display-Bildspeicher belegt rund 131 KiB RAM; scheitert das Anlegen, meldet die Firmware `[GFX] ERROR` und überspringt das Zeichnen.
 Warnschwelle (Standard 10 %) und Abschaltzeit (Standard 5 min) stellt man in der Pi-Oberfläche unter Einstellungen ein; der Taster holt sie über `/api/display`. Die Warnung beginnt nach drei aufeinanderfolgenden Messungen unter der Schwelle. Sie erlischt nach drei Messungen mindestens zwei Prozentpunkte darüber. Die Abschaltzeit zählt nur, solange der Akku unter der Warnschwelle liegt. Pieptonabstand und Blinkdauer stehen in `src/config.h`.
 

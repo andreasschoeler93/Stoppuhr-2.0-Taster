@@ -337,11 +337,11 @@ void postVitals() {
   const bool wasRejected = rejectionSeen;
   portEXIT_CRITICAL(&qMux);
   const int baseLength = snprintf(body, sizeof(body),
-           "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
+           "{\"mac\":\"%s\",\"battery\":%u,\"battery_raw\":%u,\"temp\":%s,\"humidity\":%s,"
            "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s,"
            "\"clock_synced\":%s,\"clock_sync_age_ms\":%ld,"
            "\"trigger_rejected\":%s,\"trigger_rejection_seen\":%s,\"logs\":",
-           deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
+           deviceMac.c_str(), (unsigned)m.vbatPercent, (unsigned)m.vbatPercentRaw, t, h, m.vbatCalc,
            WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000),
            (unsigned long)ackVer, clock, clockSynced ? "true" : "false", reportedSyncAgeMs,
            rejected ? "true" : "false", wasRejected ? "true" : "false");
