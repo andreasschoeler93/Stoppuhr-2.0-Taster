@@ -16,6 +16,9 @@ bool sendAbortRun(int64_t pressUs);
 enum class AbortStatus : uint8_t { NONE, PENDING, CONFIRMED, FAILED };
 AbortStatus abortStatus(int64_t pressUs);
 size_t queued();
+bool queueOverflowed();
+bool triggerRejected();
+void reportQueueOverflow();
 // false, wenn der Pi seit einigen Sekunden nicht mehr antwortet (oder noch nie geantwortet hat)
 bool serverOnline();
 // 0 = nicht verbunden, 1..4 = Signalstaerke

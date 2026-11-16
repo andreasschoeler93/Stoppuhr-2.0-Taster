@@ -276,6 +276,23 @@ void drawAbortNotice(netlink::AbortStatus status, bool red) {
   display::flush();
 }
 
+void drawTriggerWarning(bool overflow, size_t queued) {
+  if (!display::ready()) return;
+  GFXcanvas16& c = display::canvas();
+  c.fillScreen(cfg::rgb565(180, 0, 0));
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans12pt7b);
+  printCentered("ACHTUNG", 80);
+  printCentered(overflow ? "Druck verloren" : "Druck abgelehnt", 120);
+  c.setFont(&FreeSans9pt7b);
+  printCentered(overflow ? "Puffer voll" : "Pi / Zuordnung pruefen", 160);
+  printCentered("Zeiten manuell pruefen!", 190);
+  char pending[32];
+  snprintf(pending, sizeof(pending), "%u noch im Puffer", static_cast<unsigned>(queued));
+  printCentered(pending, 225);
+  display::flush();
+}
+
 void drawSplash(char letter, const measure::Data& m) {
   if (!display::ready()) return;
 

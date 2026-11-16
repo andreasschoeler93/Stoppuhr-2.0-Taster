@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "button.h"
 #include "device_log.h"
 #include "measurements.h"
 
@@ -27,6 +28,8 @@ struct Event {
 Event queue[cfg::Net::QUEUE_MAX];
 size_t qHead = 0;
 size_t qCount = 0;
+bool queueOverflow = false;
+bool rejectedTrigger = false;
 uint32_t counter = 0;
 uint32_t bootId = 0;
 int64_t abortPressUs = 0;
@@ -235,8 +238,7 @@ bool peek(Event& e) {
   return ok;
 }
 
-// Entfernt den Kopf nur, wenn es noch das gesendete Event ist. Lief die Queue
-// waehrend des Sendens voll, wurde der Kopf bereits verworfen.
+// Entfernt den Kopf nur, wenn es noch das gesendete Event ist.
 void popIfHead(uint32_t id) {
   portENTER_CRITICAL(&qMux);
   if (qCount && queue[qHead].id == id) {
@@ -594,7 +596,18 @@ bool deliver(const Event& e) {
   if (WiFi.status() != WL_CONNECTED) return false;
   // Der beim Druck festgehaltene Zeitstempel zaehlt: faellt der Pi aus und startet mit falscher Uhr
   // neu, springt die Taster-Uhr beim naechsten Zeitabgleich und wuerde den Druck verschieben.
-  int64_t ts = e.abortRun ? 0 : (e.epochMs ? e.epochMs : epochMsFor(e.pressUs));
+  int64_t ts = e.epochMs;
+  if (!e.abortRun && ts == 0) {
+    const int64_t calculated = epochMsFor(e.pressUs);
+    if (calculated != 0) {
+      portENTER_CRITICAL(&qMux);
+      if (qCount && queue[qHead].id == e.id) {
+        if (queue[qHead].epochMs == 0) queue[qHead].epochMs = calculated;
+        ts = queue[qHead].epochMs;
+      }
+      portEXIT_CRITICAL(&qMux);
+    }
+  }
   if (!e.abortRun && ts == 0) return false;
   uint32_t backoff = cfg::Net::RETRY_BACKOFF_MS;
   for (int attempt = 1; attempt <= cfg::Net::RETRY_COUNT; attempt++) {
@@ -612,14 +625,20 @@ bool deliver(const Event& e) {
       logLine(e.id, attempt, code, "sent");
       return true;
     }
-    if (code >= 400 && code < 500) {  // Clientfehler: Retry sinnlos
+    if (code >= 400 && code < 500) {
       if (e.abortRun) {
         portENTER_CRITICAL(&qMux);
         if (abortPressUs == e.pressUs) abortResult = AbortStatus::FAILED;
         portEXIT_CRITICAL(&qMux);
+        logLine(e.id, attempt, code, "dropped");
+        return true;
       }
-      logLine(e.id, attempt, code, "dropped");
-      return true;
+      portENTER_CRITICAL(&qMux);
+      const bool firstRejection = !rejectedTrigger;
+      rejectedTrigger = true;
+      portEXIT_CRITICAL(&qMux);
+      if (firstRejection) logLine(e.id, attempt, code, "rejected_retained");
+      return false;
     }
     if (attempt < cfg::Net::RETRY_COUNT) {
       logLine(e.id, attempt, code, "retried");
@@ -755,6 +774,10 @@ void performOta(const OtaOffer& offer) {
     uint32_t done = 0;
     uint32_t lastData = millis();
     while (done < offer.size) {
+      if (button::pending() || queued() != 0 || button::overflowed() || queueOverflowed() || triggerRejected()) {
+        err = "tastendruck";
+        break;
+      }
       size_t avail = stream->available();
       if (!avail) {
         if (!http.connected() || millis() - lastData > 8000) { err = "abbruch"; break; }
@@ -767,6 +790,8 @@ void performOta(const OtaOffer& offer) {
       lastData = millis();
       otaPercent = (uint8_t)((uint64_t)done * 100 / offer.size);
     }
+    if (!err && (button::pending() || queued() != 0 || button::overflowed()
+                 || queueOverflowed() || triggerRejected())) err = "tastendruck";
     if (!err && !Update.end(true)) err = "pruefsumme";
     if (err) Update.abort();
   }
@@ -776,7 +801,7 @@ void performOta(const OtaOffer& offer) {
     vTaskDelay(pdMS_TO_TICKS(500));
     ESP.restart();
   }
-  strlcpy(otaFailedVersion, offer.version, sizeof(otaFailedVersion));
+  if (strcmp(err, "tastendruck") != 0) strlcpy(otaFailedVersion, offer.version, sizeof(otaFailedVersion));
   otaBusy = false;
   postOtaStatus(offer.version, err);
 }
@@ -793,12 +818,13 @@ void housekeepingTask(void*) {
     offer = otaOffer;
     portEXIT_CRITICAL(&otaMux);
     // Nie waehrend eines laufenden Laufs oder mit ungesendeten Tastendruecken
-    if (offer.valid && strcmp(offer.version, otaFailedVersion) != 0 && qCount == 0 &&
+    if (offer.valid && strcmp(offer.version, otaFailedVersion) != 0 && queued() == 0
+        && !button::pending() && !button::overflowed() && !queueOverflowed() && !triggerRejected() &&
         WiFi.status() == WL_CONNECTED) {
       portENTER_CRITICAL(&roleMux);
-      const bool running = roleValid && roleState.state == RoleInfo::RUNNING;
+      const bool assigned = roleValid && (roleState.role != RoleInfo::NONE || roleState.pendingLane != 0);
       portEXIT_CRITICAL(&roleMux);
-      if (!running) performOta(offer);
+      if (!assigned) performOta(offer);
     }
     if (reregisterNow) {
       reregisterNow = false;
@@ -906,21 +932,18 @@ bool enqueueEvent(int64_t pressUs, bool abortRun) {
   uint32_t id = ++counter;
   const int64_t epochMs = abortRun ? 0 : epochMsFor(pressUs);
   bool queuedOk = false;
-  bool dropped = false;
+  bool overflow = false;
   portENTER_CRITICAL(&qMux);
-  if (qCount == cfg::Net::QUEUE_MAX) {  // Drop-Strategie: aeltestes Event verwerfen
-    if (queue[qHead].abortRun && queue[qHead].pressUs == abortPressUs) abortResult = AbortStatus::FAILED;
-    qHead = (qHead + 1) % cfg::Net::QUEUE_MAX;
-    qCount--;
-    dropped = true;
-  }
-  if (cfg::Net::ENABLE_OFFLINE_QUEUE || qCount == 0) {
+  if (qCount == cfg::Net::QUEUE_MAX) {
+    queueOverflow = true;
+    overflow = true;
+  } else if (cfg::Net::ENABLE_OFFLINE_QUEUE || qCount == 0) {
     queue[(qHead + qCount) % cfg::Net::QUEUE_MAX] = {id, pressUs, abortRun, epochMs};
     qCount++;
     queuedOk = true;
   }
   portEXIT_CRITICAL(&qMux);
-  if (dropped) logLine(id, 0, 0, "dropped");
+  if (overflow) logLine(id, 0, 0, "queue_full_rejected");
   return queuedOk;
 }
 
@@ -949,7 +972,33 @@ AbortStatus abortStatus(int64_t pressUs) {
   return result;
 }
 
-size_t queued() { return qCount; }
+size_t queued() {
+  portENTER_CRITICAL(&qMux);
+  const size_t count = qCount;
+  portEXIT_CRITICAL(&qMux);
+  return count;
+}
+
+bool queueOverflowed() {
+  portENTER_CRITICAL(&qMux);
+  const bool overflow = queueOverflow;
+  portEXIT_CRITICAL(&qMux);
+  return overflow;
+}
+
+bool triggerRejected() {
+  portENTER_CRITICAL(&qMux);
+  const bool rejected = rejectedTrigger;
+  portEXIT_CRITICAL(&qMux);
+  return rejected;
+}
+
+void reportQueueOverflow() {
+  portENTER_CRITICAL(&qMux);
+  queueOverflow = true;
+  portEXIT_CRITICAL(&qMux);
+  device_log::addf("finish press buffer full");
+}
 
 int wifiRssi() { return WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0; }
 

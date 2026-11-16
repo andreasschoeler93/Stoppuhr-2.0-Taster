@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.19.8)
+# Taster – Firmware (v0.20.0)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -114,6 +114,23 @@ Nach einem angenommenen Druck werden weitere Drücke bei allen Rollen für 300 m
 offline; ignorierte Drücke piepen nicht und erzeugen kein Ereignis. Zwei echte Drücke innerhalb von 300 ms
 werden nicht getrennt erfasst. Andere Signaltöne (z. B. Laufstart oder
 Bahnstopp) und das Sekunden-Piepen beim gehaltenen Starter bleiben erhalten.
+
+Ab v0.20.0 umfasst die Netzwerk-Warteschlange 128 Ereignisse. Ist sie voll,
+bleiben die alten Ereignisse erhalten; neue werden abgelehnt. Der Taster zeigt dauerhaft eine rote
+Warnung, zeigt die Anzahl der noch gespeicherten Ereignisse und piept wiederholt. Ein vom Pi mit HTTP 4xx abgelehnter Druck bleibt ebenfalls zur erneuten
+Zustellung in der Warteschlange und erzeugt eine Warnung; er kann die nachfolgenden Drücke blockieren.
+Ausgenommen sind Abbruchanfragen und die bisherige HTTP-409-Duplikatbehandlung. Bei einer Warnung den
+Wettkampf unterbrechen und alle Zeiten prüfen. Die Warnung bleibt bis zum Neustart; vorher muss die
+Warteschlange geleert bzw. der Vorfall geklärt sein. Der Puffer und die Warnung liegen nur im RAM und
+gehen bei Neustart oder Stromverlust verloren. Ein voller temporärer Zieleinlaufpuffer löst ebenfalls
+eine Verlustwarnung aus.
+Auch ein Überlauf des Interrupt-Eingangspuffers wird angezeigt. Ein noch nicht synchronisierter
+Zeitstempel wird vor dem ersten Sendeversuch festgehalten und bei Wiederholungen nicht neu berechnet.
+Ein angefordertes Abschalten wird bei gepufferten Ereignissen oder einer Verlustwarnung zurückgestellt;
+der Akku-Schutz schaltet weiterhin wie eingestellt ab und kann dabei RAM-Inhalte verlieren.
+Firmware-Updates werden ab v0.20.0 nur ohne zugewiesene/vorgemerkte Rolle und ohne
+offene Ereignisse begonnen; ein Tastendruck während des Downloads bricht ihn ab.
+
 Wird der Starter fünf Sekunden gehalten, fordert er den Abbruch des zu diesem Druck gehörenden Versuchs an:
 Nach mehr als einer Sekunde Halten erscheint „Achtung Startabbruch“ mit rot/grün wechselndem Hintergrund; beim Halten ertönt ein Piepton pro Sekunde.
 Der erste Druck hat schon als Start, Stopp oder Zieleinlauf gewirkt; ein zuvor extern abgerufenes Ergebnis kann nicht
@@ -171,7 +188,7 @@ Der Header `X-Api-Key` wird nur gesendet, wenn ein Schlüssel konfiguriert ist. 
 | `HTTP_TIMEOUT_MS` | 1500 | Timeout je Request |
 | `RETRY_COUNT`, `RETRY_BACKOFF_MS` | 3, 100 | Versuche je Zustellung, Start-Backoff (verdoppelt sich) |
 | `FLUSH_RETRY_MS` | 500 | Pause nach gescheiterter Zustellung |
-| `ENABLE_OFFLINE_QUEUE`, `QUEUE_MAX` | true, 32 | Events puffern (nur RAM); bei Überlauf fällt das älteste weg |
+| `ENABLE_OFFLINE_QUEUE`, `QUEUE_MAX` | true, 128 | Events im RAM puffern; bei Überlauf bleiben alte Ereignisse erhalten und neue werden mit Warnung abgelehnt |
 | `TRIGGER_MIN_INTERVAL_MS` | 300 | Entprellung zusätzlich zur Hardware-Entprellung (40 ms) |
 
 ## Projektstruktur

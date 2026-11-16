@@ -12,6 +12,7 @@ volatile int64_t lastEdgeUs = 0;
 volatile int64_t queue[QUEUE_SIZE];
 volatile uint8_t head = 0;
 volatile uint8_t count = 0;
+volatile bool overflow = false;
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
 // Eine fallende Flanke zaehlt nur nach Ruhe auf der Leitung (Entprellung);
@@ -19,11 +20,17 @@ portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR onEdge() {
   int64_t now = esp_timer_get_time();
   bool low = digitalRead(cfg::Pins::BUTTON) == LOW;
-  if (low && now - lastEdgeUs >= (int64_t)cfg::Timing::DEBOUNCE_MS * 1000 && count < QUEUE_SIZE) {
-    queue[(head + count) % QUEUE_SIZE] = now;
-    count = count + 1;
+  portENTER_CRITICAL_ISR(&mux);
+  if (low && now - lastEdgeUs >= (int64_t)cfg::Timing::DEBOUNCE_MS * 1000) {
+    if (count < QUEUE_SIZE) {
+      queue[(head + count) % QUEUE_SIZE] = now;
+      count = count + 1;
+    } else {
+      overflow = true;
+    }
   }
   lastEdgeUs = now;
+  portEXIT_CRITICAL_ISR(&mux);
 }
 
 }  // namespace
@@ -44,6 +51,20 @@ bool pressed(int64_t* pressTimeUs) {
   }
   portEXIT_CRITICAL(&mux);
   return hit;
+}
+
+bool pending() {
+  portENTER_CRITICAL(&mux);
+  const bool result = count != 0;
+  portEXIT_CRITICAL(&mux);
+  return result;
+}
+
+bool overflowed() {
+  portENTER_CRITICAL(&mux);
+  const bool result = overflow;
+  portEXIT_CRITICAL(&mux);
+  return result;
 }
 
 bool down() {

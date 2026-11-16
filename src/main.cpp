@@ -84,7 +84,9 @@ void setup() {
 }
 
 void loop() {
-  if (netlink::shutdownRequested()) {
+  if (netlink::shutdownRequested() && netlink::queued() == 0 && !button::pending()
+      && !pendingButtonPress && finPressN == 0 && !button::overflowed()
+      && !netlink::queueOverflowed() && !netlink::triggerRejected()) {
     digitalWrite(cfg::Pins::HOLD, LOW);
     return;
   }
@@ -119,10 +121,9 @@ void loop() {
       if (!netlink::serverOnline()) {
         // Pi nicht erreichbar: Offline-Uhren bedienen (weiter unten), siehe offFin*
         if (finPressN >= sizeof(finPress) / sizeof(finPress[0])) {
-          device_log::addf("finish press buffer full");
+          netlink::reportQueueOverflow();
         } else if (pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS)) {
           finPress[finPressN++] = pressUs;
-          beep::click();
         }
         continue;
       }
@@ -135,17 +136,11 @@ void loop() {
     // Starter mit Zieleinlauf, Pi aus: Druecke bedienen die lokalen Uhren (siehe offFin*)
     while (button::pressed(&pressUs)) {
       if (finPressN >= sizeof(finPress) / sizeof(finPress[0])) {
-        device_log::addf("finish press buffer full");
+        netlink::reportQueueOverflow();
         continue;
       }
       if (!pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS)) continue;
       finPress[finPressN++] = pressUs;
-      beep::click();
-      pendingPressUs = pressUs;
-      pendingButtonPress = true;
-      pendingStarter = true;
-      pendingTriggered = true;
-      longPressSent = false;
     }
   } else if (!pendingButtonPress && button::pressed(&pressUs)) {
     if (pressGate.accept(pressUs, cfg::Net::TRIGGER_MIN_INTERVAL_MS) && netlink::sendTrigger(pressUs)) {
@@ -241,7 +236,11 @@ void loop() {
   } else if (!offline && offActive) {
     offActive = false;
   }
-  if (!offline) finPressN = 0;
+  if ((!offline || !finLike) && finPressN) {
+    for (uint8_t i = 0; i < finPressN; i++) {
+      if (netlink::sendTrigger(finPress[i])) beep::click();
+    }
+  }
   if (offline && finLike) {
     const bool isStarter = ri.role == netlink::RoleInfo::STARTER;
     for (uint8_t i = 0; i < finPressN; i++) {
@@ -253,8 +252,19 @@ void loop() {
         offFinCount = 0;
         offStartUs = us;
         if (isStarter) offRun = offNextRun++;
+        beep::click();
       } else if (netlink::sendTrigger(us)) {
         offFinMs[offFinCount++] = (int32_t)((us - offStartUs) / 1000);
+        beep::click();
+      } else {
+        continue;
+      }
+      if (isStarter) {
+        pendingPressUs = us;
+        pendingButtonPress = true;
+        pendingStarter = true;
+        pendingTriggered = true;
+        longPressSent = false;
       }
     }
   }
@@ -348,6 +358,24 @@ void loop() {
   }
   const bool offChanged = offKey != lastOffKey;
   lastOffKey = offKey;
+
+  const bool overflowWarning = netlink::queueOverflowed() || button::overflowed();
+  if (overflowWarning || netlink::triggerRejected()) {
+    static uint32_t lastDrawMs = 0;
+    static uint32_t lastWarningMs = 0;
+    static bool warned = false;
+    if (!warned || millis() - lastDrawMs >= 1000) {
+      screens::drawTriggerWarning(overflowWarning, netlink::queued());
+      lastDrawMs = millis();
+    }
+    if (!warned || millis() - lastWarningMs >= 10000) {
+      beep::abortRun();
+      lastWarningMs = millis();
+      warned = true;
+    }
+    delay(5);
+    return;
+  }
 
   static bool abortScreenShown = false;
   static bool lastAbortRed = false;
