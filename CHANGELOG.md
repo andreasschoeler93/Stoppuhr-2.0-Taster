@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.22.0 | 2026-11-16 | 0.44.0 | HTTP-4xx-Ablehnungen und der aktuelle Pufferstatus werden über Vitaldaten im Pi-Dashboard angezeigt statt am Taster. Ein abgelehnter Druck bleibt im Puffer; bei Offline-Tastern kann die Meldung fehlen oder veraltet sein. |
 | v0.21.0 | 2026-11-16 | 0.43.0 | Bedien- und Bestätigungstöne über den Pi schaltbar; Akku-, Funk-, Abbruch- und Ereigniswarnungen bleiben hörbar. Übernahme über die Vitalmeldung; Offline-Taster aktualisieren sich nach Wiederverbindung. |
 | v0.20.0 | 2026-11-16 | 0.42.0 | Größerer Ereignispuffer, Warnung bei Überlauf oder abgelehntem Druck, stabile Zeitstempel bei Wiederholungen und Schutz offener Ereignisse vor Abschaltung und Firmware-Update. Puffer bleibt flüchtig; echte Hardware- und Ausfalltests stehen aus. |
 | v0.19.8 | 2026-11-15 | 0.41.23 | Starter-Anzeigestatus per HTTP-Long-Poll sofort vom Pi übernehmen; bei Fehlern und älteren Pi-Versionen bleibt die bisherige Abfrage aktiv. Messzeitstempel und Trigger-Senden unverändert. |

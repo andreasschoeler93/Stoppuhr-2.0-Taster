@@ -360,7 +360,7 @@ void loop() {
   lastOffKey = offKey;
 
   const bool overflowWarning = netlink::queueOverflowed() || button::overflowed();
-  if (overflowWarning || netlink::triggerRejected()) {
+  if (overflowWarning) {
     static uint32_t lastDrawMs = 0;
     static uint32_t lastWarningMs = 0;
     static bool warned = false;

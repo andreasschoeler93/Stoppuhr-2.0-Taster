@@ -31,6 +31,7 @@ size_t qHead = 0;
 size_t qCount = 0;
 bool queueOverflow = false;
 bool rejectedTrigger = false;
+bool rejectionSeen = false;
 uint32_t counter = 0;
 uint32_t bootId = 0;
 int64_t abortPressUs = 0;
@@ -245,6 +246,7 @@ void popIfHead(uint32_t id) {
   if (qCount && queue[qHead].id == id) {
     qHead = (qHead + 1) % cfg::Net::QUEUE_MAX;
     qCount--;
+    rejectedTrigger = false;
   }
   portEXIT_CRITICAL(&qMux);
 }
@@ -330,13 +332,19 @@ void postVitals() {
   const uint32_t syncAgeMs = millis() - lastSntpSyncMs;
   const bool clockSynced = hasSntpSync && syncAgeMs <= cfg::Net::NTP_SYNC_MAX_AGE_MS;
   const long reportedSyncAgeMs = hasSntpSync ? static_cast<long>(syncAgeMs) : -1;
+  portENTER_CRITICAL(&qMux);
+  const bool rejected = rejectedTrigger;
+  const bool wasRejected = rejectionSeen;
+  portEXIT_CRITICAL(&qMux);
   const int baseLength = snprintf(body, sizeof(body),
            "{\"mac\":\"%s\",\"battery\":%u,\"temp\":%s,\"humidity\":%s,"
            "\"vbat\":%.3f,\"rssi\":%d,\"ssid\":\"%.32s\",\"fw\":\"%s\",\"uptime_s\":%lu,\"wv\":%lu%s,"
-           "\"clock_synced\":%s,\"clock_sync_age_ms\":%ld,\"logs\":",
+           "\"clock_synced\":%s,\"clock_sync_age_ms\":%ld,"
+           "\"trigger_rejected\":%s,\"trigger_rejection_seen\":%s,\"logs\":",
            deviceMac.c_str(), (unsigned)m.vbatPercent, t, h, m.vbatCalc,
            WiFi.RSSI(), WiFi.SSID().c_str(), FW_VERSION, (unsigned long)(millis() / 1000),
-           (unsigned long)ackVer, clock, clockSynced ? "true" : "false", reportedSyncAgeMs);
+           (unsigned long)ackVer, clock, clockSynced ? "true" : "false", reportedSyncAgeMs,
+           rejected ? "true" : "false", wasRejected ? "true" : "false");
   if (baseLength < 0 || static_cast<size_t>(baseLength) >= sizeof(body)) {
     device_log::addf("vitals payload prefix too large");
     return;
@@ -649,6 +657,7 @@ bool deliver(const Event& e) {
       portENTER_CRITICAL(&qMux);
       const bool firstRejection = !rejectedTrigger;
       rejectedTrigger = true;
+      rejectionSeen = true;
       portEXIT_CRITICAL(&qMux);
       if (firstRejection) logLine(e.id, attempt, code, "rejected_retained");
       return false;

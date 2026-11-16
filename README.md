@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.21.0)
+# Taster – Firmware (v0.22.0)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -125,9 +125,14 @@ Bahnstopp) und das Sekunden-Piepen beim gehaltenen Starter bleiben erhalten.
 Ab v0.20.0 umfasst die Netzwerk-Warteschlange 128 Ereignisse. Ist sie voll,
 bleiben die alten Ereignisse erhalten; neue werden abgelehnt. Der Taster zeigt dauerhaft eine rote
 Warnung, zeigt die Anzahl der noch gespeicherten Ereignisse und piept wiederholt. Ein vom Pi mit HTTP 4xx abgelehnter Druck bleibt ebenfalls zur erneuten
-Zustellung in der Warteschlange und erzeugt eine Warnung; er kann die nachfolgenden Drücke blockieren.
+Zustellung in der Warteschlange; er kann die nachfolgenden Drücke blockieren. Ab v0.22.0
+wird die Ablehnung nur noch im Pi-Dashboard ab v0.44.0 angezeigt, nicht auf dem Taster: Sie wird bei der nächsten
+erfolgreichen Vitalmeldung übertragen und nach dem Neustart des Tasters bei der nächsten Vitalmeldung zurückgesetzt. Bei einem
+offline geschalteten Taster kann die Meldung fehlen oder veraltet sein. Nach einer späteren Annahme wird
+der Druck aus der Warteschlange entfernt, aber die Meldung bleibt zur Prüfung erhalten; eine Annahme
+bedeutet nicht zwangsläufig eine gewertete Zeit.
 Ausgenommen sind Abbruchanfragen und die bisherige HTTP-409-Duplikatbehandlung. Bei einer Warnung den
-Wettkampf unterbrechen und alle Zeiten prüfen. Die Warnung bleibt bis zum Neustart; vorher muss die
+Wettkampf unterbrechen und alle Zeiten prüfen. Die Überlaufwarnung bleibt bis zum Neustart; vorher muss die
 Warteschlange geleert bzw. der Vorfall geklärt sein. Der Puffer und die Warnung liegen nur im RAM und
 gehen bei Neustart oder Stromverlust verloren. Ein voller temporärer Zieleinlaufpuffer löst ebenfalls
 eine Verlustwarnung aus.
