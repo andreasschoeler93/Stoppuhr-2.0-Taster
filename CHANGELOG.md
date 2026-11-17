@@ -6,6 +6,7 @@ Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9
 
 | Version | Datum | Pi | Änderung |
 |---|---|---|---|
+| v0.22.2 | 2026-11-17 | 0.44.6 | Grenzen der Akkuanzeige über den Pi einstellbar (Standard 3,30 V und 4,00 V). Warnung und Abschaltung behalten die bisherige Kennlinie; die Spannung bleibt unverändert. |
 | v0.22.1 | 2026-11-16 | 0.44.3 | Prozentanzeige und Prozentverlauf mit Median der letzten fünf gültigen Messungen glätten. Akkuspannung, Akkusymbol und Akkuschutz bleiben ungeglättet; Pi erhält separaten Roh-Prozentwert für Warnungen. |
 | v0.22.0 | 2026-11-16 | 0.44.0 | HTTP-4xx-Ablehnungen und der aktuelle Pufferstatus werden über Vitaldaten im Pi-Dashboard angezeigt statt am Taster. Ein abgelehnter Druck bleibt im Puffer; bei Offline-Tastern kann die Meldung fehlen oder veraltet sein. |
 | v0.21.0 | 2026-11-16 | 0.43.0 | Bedien- und Bestätigungstöne über den Pi schaltbar; Akku-, Funk-, Abbruch- und Ereigniswarnungen bleiben hörbar. Übernahme über die Vitalmeldung; Offline-Taster aktualisieren sich nach Wiederverbindung. |

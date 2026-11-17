@@ -31,6 +31,7 @@ bool shutdownRequested();
 // Akkuwarnung vom Pi: Schwelle in Prozent (0 = aus) und Abschaltzeit in ms (0 = nie)
 uint8_t lowBatteryPercent();
 uint32_t lowBatteryShutdownMs();
+void batteryDisplayLimits(uint16_t& zeroMv, uint16_t& fullMv);
 // true, solange ein Firmware-Update vom Pi laeuft; percent = Fortschritt 0..100
 bool otaActive(uint8_t& percent);
 

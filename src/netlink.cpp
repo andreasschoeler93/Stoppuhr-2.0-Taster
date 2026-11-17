@@ -44,6 +44,9 @@ volatile bool shutdownRequestedFlag = false;
 // Akkuwarnung, vom Pi einstellbar (Startwerte aus config.h)
 volatile uint8_t lowBatteryPct = cfg::Timing::LOW_BATTERY_PERCENT;
 volatile uint16_t lowBatteryMin = cfg::Timing::LOW_BATTERY_SHUTDOWN_MS / 60000UL;
+uint16_t batteryZeroMv = 3300;
+uint16_t batteryFullMv = 4000;
+portMUX_TYPE batteryLimitsMux = portMUX_INITIALIZER_UNLOCKED;
 RoleInfo roleState;
 bool roleValid = false;
 bool roleLossPending = false;
@@ -499,6 +502,16 @@ uint8_t pollDisplay() {
   }
   lowBatteryPct = (uint8_t)constrain(jsonInt(body, "low_battery_pct", lowBatteryPct), 0, 100);
   lowBatteryMin = (uint16_t)constrain(jsonInt(body, "low_battery_min", lowBatteryMin), 0, 1440);
+  int32_t zeroMv = jsonInt(body, "battery_zero_mv", -1);
+  int32_t fullMv = jsonInt(body, "battery_full_mv", -1);
+  if (zeroMv >= 2500 && fullMv <= 4500 && fullMv - zeroMv >= 100) {
+    portENTER_CRITICAL(&batteryLimitsMux);
+    batteryZeroMv = static_cast<uint16_t>(zeroMv);
+    batteryFullMv = static_cast<uint16_t>(fullMv);
+    portEXIT_CRITICAL(&batteryLimitsMux);
+  } else if (zeroMv != -1 || fullMv != -1) {
+    device_log::addf("invalid battery display limits");
+  }
 
   RoleInfo r;
   char roleText[12];
@@ -1028,6 +1041,12 @@ char letter() { return tasterLetter; }
 bool shutdownRequested() { return shutdownRequestedFlag; }
 uint8_t lowBatteryPercent() { return lowBatteryPct; }
 uint32_t lowBatteryShutdownMs() { return (uint32_t)lowBatteryMin * 60000UL; }
+void batteryDisplayLimits(uint16_t& zeroMv, uint16_t& fullMv) {
+  portENTER_CRITICAL(&batteryLimitsMux);
+  zeroMv = batteryZeroMv;
+  fullMv = batteryFullMv;
+  portEXIT_CRITICAL(&batteryLimitsMux);
+}
 
 bool otaActive(uint8_t& percent) {
   percent = otaPercent;
