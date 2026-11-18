@@ -22,7 +22,32 @@ constexpr bool smoothingBehavior() {
   return median.add(battery::displayPercent(4.00f)) == 100;
 }
 
+constexpr bool configurableCurveBehavior(uint16_t zero, uint16_t full) {
+  uint8_t previous = 0;
+  for (int mv = 2500; mv <= 4500; ++mv) {
+    const uint8_t value = battery::displayPercent(mv / 1000.0f, zero, full);
+    if (value < previous || (mv <= zero && value != 0) ||
+        (mv < full && value == 100) || (mv >= full && value != 100)) return false;
+    previous = value;
+  }
+  return true;
+}
+
+constexpr bool originalCurveBehavior() {
+  for (int mv = 3300; mv <= 4200; ++mv) {
+    uint8_t original = battery::protectionPercent(mv / 1000.0f);
+    if (mv < 4200 && original == 100) original = 99;
+    if (battery::displayPercent(mv / 1000.0f, 3300, 4200) != original) return false;
+  }
+  return true;
+}
+
 static_assert(curveBehavior(), "Kennlinie ist monoton und erreicht 100 Prozent erst bei 4 V");
+static_assert(originalCurveBehavior(), "Urspruengliche Kurve bei 3,30 bis 4,20 V");
+static_assert(configurableCurveBehavior(2500, 4500), "Breiter Bereich");
+static_assert(configurableCurveBehavior(3800, 3900), "Bereich unter 3,95 V");
+static_assert(configurableCurveBehavior(4000, 4100), "Bereich ueber 3,95 V");
+static_assert(configurableCurveBehavior(3500, 4200), "Abweichende Untergrenze");
 static_assert(smoothingBehavior(), "Glattung bleibt bei neuer Kennlinie erhalten");
 static_assert(battery::displayPercent(3.30f) == 0, "Untergrenze");
 static_assert(battery::displayPercent(3.69f) == 10, "Warnbereich unveraendert");
@@ -34,9 +59,11 @@ static_assert(battery::displayPercent(4.20f) == 100, "Obergrenze");
 static_assert(battery::protectionPercent(3.98f) == 75, "Schutzkurve unveraendert");
 static_assert(battery::protectionPercent(4.00f) == 78, "Schutzkurve bleibt unabhaengig");
 static_assert(battery::protectionPercent(4.20f) == 100, "Schutzkurve Obergrenze");
+static_assert(battery::displayPercent(4.11f, 3300, 4200) == 90, "Urspruengliche Kurve bei 4,11 V");
+static_assert(battery::displayPercent(4.01f, 3300, 4200) == 79, "Urspruengliche Kurve bei 4,01 V");
 static_assert(battery::displayPercent(3.50f, 3500, 4200) == 0, "Einstellbare Untergrenze");
-static_assert(battery::displayPercent(3.89f, 3500, 4200) == 10, "Kennlinie wird verschoben");
+static_assert(battery::displayPercent(3.95f, 3500, 4200) == 70, "Stuetzpunkt bleibt erhalten");
 static_assert(battery::displayPercent(4.20f, 3500, 4200) == 100, "Einstellbare Obergrenze");
 static_assert(battery::displayPercent(4.30f, 3500, 4200) == 100, "Oberhalb der Obergrenze");
-static_assert(battery::displayPercent(3.65f, 3000, 4300) == battery::displayPercent(3.65f),
-              "Halber Bereich behaelt die Kennlinienform");
+static_assert(battery::displayPercent(3.95f, 3000, 4300) == 70, "Kennlinie bei anderen Grenzen");
+static_assert(battery::displayPercent(4.05f, 4000, 4100) == 70, "Stuetzpunkt im engen Bereich");

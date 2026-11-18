@@ -32,11 +32,17 @@ constexpr float displayCurveVoltage(float voltage, uint16_t zeroMv, uint16_t ful
 }
 
 constexpr uint8_t displayPercent(float voltage, uint16_t zeroMv = 3300, uint16_t fullMv = 4000) {
-  if (!(voltage > zeroMv / 1000.0f)) return 0;
-  if (voltage >= fullMv / 1000.0f) return 100;
-  voltage = displayCurveVoltage(voltage, zeroMv, fullMv);
-  if (!(voltage > 3.95f)) return protectionPercent(voltage);
-  const uint8_t percent = static_cast<uint8_t>(70.0f + (voltage - 3.95f) * 30.0f / 0.05f + 0.5f);
+  const float zero = zeroMv / 1000.0f;
+  const float full = fullMv / 1000.0f;
+  if (!(voltage > zero)) return 0;
+  if (voltage >= full) return 100;
+  const float pivot = zero < 3.95f && full > 3.95f ? 3.95f : (zero + full) / 2.0f;
+  const float curveVoltage = voltage <= pivot
+    ? (zeroMv == 3300 && pivot == 3.95f
+       ? voltage : 3.30f + (voltage - zero) * 0.65f / (pivot - zero))
+    : (fullMv == 4200 && pivot == 3.95f
+       ? voltage : 3.95f + (voltage - pivot) * 0.25f / (full - pivot));
+  const uint8_t percent = protectionPercent(curveVoltage);
   return percent < 100 ? percent : 99;
 }
 
