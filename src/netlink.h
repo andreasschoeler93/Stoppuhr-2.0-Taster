@@ -25,7 +25,7 @@ bool serverOnline();
 uint8_t wifiLevel();
 // Signalstaerke in dBm (0, wenn nicht verbunden)
 int wifiRssi();
-// Vom Server vergebener Buchstabe (A-J); '?' bis zur Anmeldung
+// Vom Server vergebener Buchstabe (A-L); '?' bis zur Anmeldung
 char letter();
 bool shutdownRequested();
 // Akkuwarnung vom Pi: Schwelle in Prozent (0 = aus) und Abschaltzeit in ms (0 = nie)

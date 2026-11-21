@@ -1,11 +1,22 @@
 # Versionsverlauf – Taster-Firmware
 
-Jede Version ist als Git-Tag `vX.Y.Z` markiert. Ab `v0.11.0` entsteht beim Tag automatisch ein GitHub-Release
-mit `firmware.bin`, das der Pi den Tastern anbieten kann. Die Spalte „Pi“ nennt die mindestens nötige
-Pi-Software (Repository `Stoppuhr`). Versionen ohne eigenen Commit (v0.8.7, v0.9.0, v0.10.4, v0.10.5) haben kein Tag.
+Die Semver-Historie der modularen Firmware beginnt mit v0.3.0. Davor gab es zwei Demo-Tags:
+v0.1 (2026-04-07) enthielt den Display-Sketch, Schaltplan und Programmierhinweise; v0.2 (2026-04-07)
+übernahm den Demo-Sketch als `TasterDemo.ino` und entfernte die vorherige Kopie. Diese Tags sind keine
+OTA-Firmware-Releases.
 
-| Version | Datum | Pi | Änderung |
+Die Tabelle dokumentiert die Versionsstände. Veröffentlichte Firmware-Releases sind als Git-Tag
+`vX.Y.Z` markiert. Ab `v0.11.0` erzeugt ein solcher Tag automatisch ein GitHub-Release mit
+`firmware.bin`, das der Pi den Tastern anbieten kann. Die Spalte „Pi“ nennt die mindestens nötige
+Pi-Software (Repository `Stoppuhr`). Versionsnummern ohne eigenen Versions-Commit (v0.8.7, v0.9.0,
+v0.10.4 und v0.10.5) haben keinen eigenen Tag.
+
+Die Datumsangaben beziehen sich auf den jeweiligen Änderungsstand; der Git-Tag oder das Release
+kann später erstellt worden sein.
+
+| Version | Änderungsdatum | Pi | Änderung |
 |---|---|---|---|
+| v0.22.4 | 2026-11-21 | 0.44.8 | Kompatibilitäts- und Dokumentationsversion: unterstützt die vom Pi vergebenen Tasterbuchstaben A–L; keine Änderung am Tasterverhalten. |
 | v0.22.3 | 2026-11-18 | 0.44.6 | Fehler der Akkuanzeige bei eingestellter 100-%-Grenze 4,20 V korrigieren; die ursprüngliche Kennlinie wird bei 3,30–4,20 V wieder verwendet. Warnung und Abschaltung bleiben unverändert. |
 | v0.22.2 | 2026-11-17 | 0.44.6 | Grenzen der Akkuanzeige über den Pi einstellbar (Standard 3,30 V und 4,00 V). Warnung und Abschaltung behalten die bisherige Kennlinie; die Spannung bleibt unverändert. |
 | v0.22.1 | 2026-11-16 | 0.44.3 | Prozentanzeige und Prozentverlauf mit Median der letzten fünf gültigen Messungen glätten. Akkuspannung, Akkusymbol und Akkuschutz bleiben ungeglättet; Pi erhält separaten Roh-Prozentwert für Warnungen. |

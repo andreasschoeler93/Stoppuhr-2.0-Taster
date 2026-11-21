@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.22.3)
+# Taster – Firmware (v0.22.4)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -169,7 +169,7 @@ Nur internes WLAN, keine Cloud. Das Senden läuft in einem eigenen Task (`src/ne
 |---|---|
 | `POST /api/triggers` | Tastendruck: `{"mac":"AA:BB:CC:DD:EE:01","ts":1761290000123,"stopwatch_ms":null,"run_id":null}`; Antwort `{"ok":true,"received_at":…,"event_id":"…"}` |
 | `POST /api/abort-run` | Langdruck des Starters: `{"mac":"…","request_id":"…"}` |
-| `POST /api/taster` | Anmeldung `{"mac","name"}`, alle 5 s bis 200, danach alle 60 s; Antwort enthält den Buchstaben `letter` (A–J) |
+| `POST /api/taster` | Anmeldung `{"mac","name"}`, alle 5 s bis 200, danach alle 60 s; Antwort enthält den Buchstaben `letter` (A–L ab Pi v0.44.8) |
 | `POST /api/vitals` | alle 10 s: `{"mac","battery","temp","humidity","vbat","rssi","ssid","fw","uptime_s","clock_ms","clock_synced","clock_sync_age_ms","wv"}`; `ts` setzt der Server |
 | `GET /api/display?mac=…` | Rolle und Anzeigedaten (mit Rolle alle 2 s, sonst alle 1 s); enthält auch Update- und WLAN-Angebote |
 | `GET /api/firmware/download?mac=…`, `POST /api/ota-status` | Update-Download und Fehlermeldung |
@@ -200,7 +200,7 @@ Der Header `X-Api-Key` wird nur gesendet, wenn ein Schlüssel konfiguriert ist. 
 | `NTP_SERVER` | `SECRET_PI_IP` | Zeitquelle |
 | `DEVICE_MAC` | leer = ESP32-MAC | Geräte-ID |
 | `API_KEY` | aus `secrets.h` | optional, als `X-Api-Key` |
-| `HTTP_TIMEOUT_MS` | 1500 | Timeout je Request |
+| `HTTP_TIMEOUT_MS` | 1000 | Timeout je Request (Long-Poll verwendet einen eigenen Timeout von 2500 ms) |
 | `RETRY_COUNT`, `RETRY_BACKOFF_MS` | 3, 100 | Versuche je Zustellung, Start-Backoff (verdoppelt sich) |
 | `FLUSH_RETRY_MS` | 500 | Pause nach gescheiterter Zustellung |
 | `ENABLE_OFFLINE_QUEUE`, `QUEUE_MAX` | true, 128 | Events im RAM puffern; bei Überlauf bleiben alte Ereignisse erhalten und neue werden mit Warnung abgelehnt |

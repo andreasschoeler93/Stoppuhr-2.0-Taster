@@ -64,21 +64,28 @@ USB-CDC ist in PlatformIO aktiviert (`ARDUINO_USB_MODE=1` und
 `ARDUINO_USB_CDC_ON_BOOT=1`). Nach dem Flashen das Gerät zurücksetzen und im
 seriellen Monitor den USB-COM-Port der laufenden Anwendung bei 115200 Baud
 öffnen. Der Port im Bootloader-Modus kann davon abweichen.
-6. Programmierhinweise (Firmware)
-Empfohlene Struktur:
-- State-Machine (BOOT, IDLE, UI, RUN, SHUTDOWN)
-- Trennung von UI, Hardware und Power-Logik
+6. Firmware-Aufbau und Programmierhinweise
+Die Firmware ist in Module unter `src/` aufgeteilt. `main.cpp` initialisiert die Hardware und
+steuert die Ansichten sowie Tastendrücke; `config.h` enthält Pins, Zeiten und Versionsnummer.
+`display.cpp` und `screens.cpp` zeichnen die Ansichten. Messung, Taster, Pieper und Diagnoseprotokoll
+liegen in den Modulen `measurements.*`, `button.*`, `beep.*` und `device_log.*`.
 
-Wichtige Hinweise:
-- Keine Delay-Schleifen im Hauptloop
-- Display-Updates zeitgesteuert
-- Unterschiedliche Töne für interne / externe Events
-- WLAN nur aktiv, wenn benötigt
+`netlink.cpp` verwaltet WLAN und Pi-Kommunikation in eigenen FreeRTOS-Tasks. Anmeldung und
+Vitaldaten werden getrennt von der Abfrage der Anzeigedaten verarbeitet; Tastendrücke werden über
+eine Warteschlange gesendet. Die WLAN-Verbindung bleibt für diese Kommunikation aktiv und wird nach
+einer Trennung regelmäßig wiederhergestellt.
 
-Abschalten:
-- HOLD_NODE = LOW
-- danach kein weiterer Code
+Im `loop()` keine blockierenden Wartezeiten ergänzen. Zeitgesteuerte Abläufe verwenden die
+vorhandenen Zeitprüfungen; asynchrone Netzwerkaufgaben bleiben in ihren eigenen Tasks. Display-Inhalte
+werden zuerst in den Bildspeicher gezeichnet und anschließend über `display.*` übertragen.
+
+Zum Abschalten deaktiviert `main.cpp` die Selbsthaltung (GPIO44) erst nach einem Pi-Abschaltbefehl
+und wenn keine Tastendrücke oder offenen/verlustgefährdeten Ereignisse mehr anstehen. Danach wird
+die Versorgung durch die Hardware getrennt.
+
 7. Entwicklungs- und Debug-Hinweise
-- Serielle Ausgabe nur im Debug-Build
-- GPIO44 nicht während Flash-Vorgang aktiv halten
-- Bei Problemen: Selbsthaltung testweise deaktivieren
+- Serielle Ausgabe: 115200 Baud; Debug-Ausgaben werden über `DBG` in `src/config.h` gesteuert.
+- Die Pinbelegung und Laufzeitwerte in `src/config.h` ändern; bei einer Firmwareänderung die Version
+  dort erhöhen und den Versionsverlauf in `CHANGELOG.md` ergänzen.
+- Den Bildspeicher und die Funktionen aus `display.*` zum Zeichnen verwenden; nicht direkt auf das
+  Display zeichnen.
