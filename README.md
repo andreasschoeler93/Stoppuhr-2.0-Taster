@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.23.0)
+# Taster – Firmware (v0.23.1)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -159,7 +159,7 @@ wird er als Fehler angezeigt. Deshalb zuerst den Pi aktualisieren.
 ### Signaltöne
 
 - Klick (2700 Hz, 100 ms): eigener Tastendruck.
-- Dumpfer Ton (1200 Hz, 110 ms): Bahn-Taster beim Laufstart, Starter bei jeder gestoppten Bahn. Der erste Datensatz nach dem Einschalten piept nicht.
+- Dumpfer Ton (1200 Hz, 110 ms): Starter bei jeder gestoppten Bahn. Bahntaster piepen beim Laufstart nicht. Der erste Datensatz nach dem Einschalten piept nicht.
 - Dreimal lang (3 × 450 ms, 2400 Hz): Lauf abgebrochen.
 
 ## Schnittstelle zum Pi

@@ -16,6 +16,7 @@ kann später erstellt worden sein.
 
 | Version | Änderungsdatum | Pi | Änderung |
 |---|---|---|---|
+| v0.23.1 | 2026-11-27 | 0.44.15 | Bahntaster piepen beim Laufstart nicht mehr; der Ton des Starters bei gestoppten Bahnen bleibt erhalten. |
 | v0.23.0 | 2026-11-27 | 0.44.15 | Taster 5 s halten: laute Abschaltwarnung mit blinkendem Countdown; Loslassen bricht ab, nach 10 s schaltet der Taster ab. Während die eigene Rolle läuft, bleibt er eingeschaltet. |
 | v0.22.4 | 2026-11-21 | 0.44.8 | Kompatibilitäts- und Dokumentationsversion: unterstützt die vom Pi vergebenen Tasterbuchstaben A–L; keine Änderung am Tasterverhalten. |
 | v0.22.3 | 2026-11-18 | 0.44.6 | Fehler der Akkuanzeige bei eingestellter 100-%-Grenze 4,20 V korrigieren; die ursprüngliche Kennlinie wird bei 3,30–4,20 V wieder verwendet. Warnung und Abschaltung bleiben unverändert. |
