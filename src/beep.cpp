@@ -58,6 +58,13 @@ void abortRun() {
   abortNextAt = millis();
 }
 
+void shutdownWarning() {
+  abortLeft = 3;
+  abortNextAt = millis();
+}
+
+void shutdownCountdown() { play(FREQ_ABORT, DUR_ABORT_MS); }
+
 void tick() {
   if (abortLeft && !offAt && (int32_t)(millis() - abortNextAt) >= 0) {
     play(FREQ_ABORT, DUR_ABORT_MS);

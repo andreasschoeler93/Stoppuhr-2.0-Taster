@@ -9,6 +9,7 @@ namespace {
 // Mehrere schnell aufeinanderfolgende Druecke bleiben in einem Ringpuffer erhalten.
 constexpr uint8_t QUEUE_SIZE = 16;
 volatile int64_t lastEdgeUs = 0;
+volatile int64_t pressedSinceUs = 0;
 volatile int64_t queue[QUEUE_SIZE];
 volatile uint8_t head = 0;
 volatile uint8_t count = 0;
@@ -22,12 +23,15 @@ void IRAM_ATTR onEdge() {
   bool low = digitalRead(cfg::Pins::BUTTON) == LOW;
   portENTER_CRITICAL_ISR(&mux);
   if (low && now - lastEdgeUs >= (int64_t)cfg::Timing::DEBOUNCE_MS * 1000) {
+    pressedSinceUs = now;
     if (count < QUEUE_SIZE) {
       queue[(head + count) % QUEUE_SIZE] = now;
       count = count + 1;
     } else {
       overflow = true;
     }
+  } else if (!low) {
+    pressedSinceUs = 0;
   }
   lastEdgeUs = now;
   portEXIT_CRITICAL_ISR(&mux);
@@ -69,6 +73,13 @@ bool overflowed() {
 
 bool down() {
   return digitalRead(cfg::Pins::BUTTON) == LOW;
+}
+
+int64_t downSinceUs() {
+  portENTER_CRITICAL(&mux);
+  const int64_t result = pressedSinceUs;
+  portEXIT_CRITICAL(&mux);
+  return result;
 }
 
 }  // namespace button

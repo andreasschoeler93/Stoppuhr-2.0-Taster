@@ -1,4 +1,4 @@
-# Taster – Firmware (v0.22.4)
+# Taster – Firmware (v0.23.0)
 
 Firmware für den Seeed XIAO ESP32-S3 (PlatformIO, Arduino-Framework). Der Taster misst den Zeitpunkt eines Tastendrucks
 auf die Mikrosekunde, schickt ihn per WLAN an den Pi (Repository `Stoppuhr`) und zeigt je nach Rolle Start, Bahn oder die Zuordnung an.
@@ -18,6 +18,7 @@ Ab v0.22.1 ist der angezeigte und an den Pi gemeldete Prozentwert der Median der
 Für Warnungen und Abschaltung bleibt auch die ursprüngliche Prozentkennlinie erhalten. Der für Warnungen verwendete Rohwert kann deshalb vom angezeigten Prozentwert abweichen; die eingestellten Warnschwellen wirken weiterhin bei denselben Spannungen.
 Der Display-Bildspeicher belegt rund 131 KiB RAM; scheitert das Anlegen, meldet die Firmware `[GFX] ERROR` und überspringt das Zeichnen.
 Warnschwelle (Standard 10 %) und Abschaltzeit (Standard 5 min) stellt man in der Pi-Oberfläche unter Einstellungen ein; der Taster holt sie über `/api/display`. Die Warnung beginnt nach drei aufeinanderfolgenden Messungen unter der Schwelle. Sie erlischt nach drei Messungen mindestens zwei Prozentpunkte darüber. Die Abschaltzeit zählt nur, solange der Akku unter der Warnschwelle liegt. Pieptonabstand und Blinkdauer stehen in `src/config.h`.
+Zum manuellen Ausschalten den Taster 10 s halten: nach 5 s beginnt eine laute Tonfolge und ein blinkender Countdown; Loslassen bricht ihn ab. Nach 10 s schaltet sich der Taster aus. Meldet die eigene Rolle gerade `running`, wird die Abschaltung gesperrt. Beim Starter bleibt der bestehende 5-s-Langdruck zum Laufabbruch aktiv.
 
 Die Firmware puffert die letzten 24 Diagnoseereignisse im RAM und sendet sie zusammen mit den Vitaldaten an den Pi (Download ab Pi v0.41.6). Der Puffer enthält unter anderem Neustartgrund, WLAN-Verbindungswechsel, Rollenwechsel und Mess-/Netzwerkfehler; er wird beim Neustart zurückgesetzt.
 

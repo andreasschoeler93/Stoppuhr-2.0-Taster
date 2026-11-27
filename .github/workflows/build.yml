@@ -32,6 +32,9 @@ jobs:
       - name: Akku-Kennlinie testen
         run: ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-g++ -std=c++17 -fsyntax-only test/test_battery_curve.cpp
 
+      - name: Ausschalt-Langdruck testen
+        run: ~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-g++ -std=c++17 -fsyntax-only test/test_power_button.cpp
+
       - uses: actions/upload-artifact@v4
         with:
           name: firmware

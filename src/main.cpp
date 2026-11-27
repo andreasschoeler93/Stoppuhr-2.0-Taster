@@ -17,6 +17,7 @@
 #include "measurements.h"
 #include "netlink.h"
 #include "press_gate.h"
+#include "power_button.h"
 #include "screens.h"
 
 namespace {
@@ -34,6 +35,7 @@ bool longPressSent = false;
 bool pendingTriggered = false;
 bool pendingStarter = false;
 bool pendingSent = false;
+bool localShutdownRequested = false;
 int64_t abortNoticePressUs = 0;
 uint32_t abortNoticeAtMs = 0;
 netlink::AbortStatus lastAbortStatus = netlink::AbortStatus::NONE;
@@ -84,9 +86,10 @@ void setup() {
 }
 
 void loop() {
-  if (netlink::shutdownRequested() && netlink::queued() == 0 && !button::pending()
-      && !pendingButtonPress && finPressN == 0 && !button::overflowed()
-      && !netlink::queueOverflowed() && !netlink::triggerRejected()) {
+  const bool serverShutdownReady = netlink::shutdownRequested() && netlink::queued() == 0 &&
+      !button::pending() && !pendingButtonPress && finPressN == 0 && !button::overflowed() &&
+      !netlink::queueOverflowed() && !netlink::triggerRejected();
+  if (localShutdownRequested || serverShutdownReady) {
     digitalWrite(cfg::Pins::HOLD, LOW);
     return;
   }
@@ -358,6 +361,58 @@ void loop() {
   }
   const bool offChanged = offKey != lastOffKey;
   lastOffKey = offKey;
+
+  static bool shutdownNoticeShown = false;
+  static bool shutdownBlocked = false;
+  static uint8_t drawnShutdownSeconds = 0xFF;
+  static bool drawnShutdownBlocked = false;
+  static bool drawnShutdownRed = false;
+  static bool finalShutdownBeepPlayed = false;
+  const int64_t heldSinceUs = button::downSinceUs();
+  if (!heldSinceUs) {
+    if (shutdownNoticeShown) {
+      shutdownNoticeShown = false;
+      shutdownBlocked = false;
+      drawnShutdownSeconds = 0xFF;
+      finalShutdownBeepPlayed = false;
+      uiMode = UiMode::SPLASH;
+      modeStartedMs = millis() - cfg::Timing::SPLASH_MS;
+    }
+  } else {
+    const uint32_t heldMs = (uint32_t)((esp_timer_get_time() - heldSinceUs) / 1000);
+    const bool unsafeToShutdown = ri.state == netlink::RoleInfo::RUNNING;
+    if (!shutdownNoticeShown && power_button::warningDue(heldMs)) {
+      shutdownNoticeShown = true;
+      shutdownBlocked = unsafeToShutdown;
+      beep::shutdownWarning();
+      device_log::addf("manual shutdown warning%s", shutdownBlocked ? " blocked during run" : "");
+    } else if (shutdownNoticeShown && unsafeToShutdown && !shutdownBlocked) {
+      shutdownBlocked = true;
+      beep::shutdownWarning();
+      device_log::addf("manual shutdown blocked during run");
+    }
+    if (shutdownNoticeShown && !shutdownBlocked && heldMs >= 9000 && !finalShutdownBeepPlayed) {
+      beep::shutdownCountdown();
+      finalShutdownBeepPlayed = true;
+    }
+    if (shutdownNoticeShown && power_button::shutdownDue(heldMs, shutdownBlocked)) {
+      device_log::addf("manual shutdown requested");
+      localShutdownRequested = true;
+    }
+    if (shutdownNoticeShown) {
+      const uint8_t remaining = power_button::secondsRemaining(heldMs);
+      const bool red = shutdownBlocked || (millis() / 500) % 2 == 0;
+      if (remaining != drawnShutdownSeconds || shutdownBlocked != drawnShutdownBlocked ||
+          red != drawnShutdownRed) {
+        screens::drawShutdownNotice(remaining, shutdownBlocked, red);
+        drawnShutdownSeconds = remaining;
+        drawnShutdownBlocked = shutdownBlocked;
+        drawnShutdownRed = red;
+      }
+      delay(5);
+      return;
+    }
+  }
 
   const bool overflowWarning = netlink::queueOverflowed() || button::overflowed();
   if (overflowWarning) {

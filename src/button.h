@@ -14,5 +14,7 @@ bool pending();
 bool overflowed();
 // Aktueller elektrischer Zustand; die Funktion blockiert nicht.
 bool down();
+// Zeitstempel der aktuellen, entprellten Druckphase; 0, wenn nicht gedrueckt.
+int64_t downSinceUs();
 
 }  // namespace button

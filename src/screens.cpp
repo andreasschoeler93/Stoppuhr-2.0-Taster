@@ -276,6 +276,29 @@ void drawAbortNotice(netlink::AbortStatus status, bool red) {
   display::flush();
 }
 
+void drawShutdownNotice(uint8_t secondsRemaining, bool blocked, bool red) {
+  if (!display::ready()) return;
+  GFXcanvas16& c = display::canvas();
+  c.fillScreen(blocked ? cfg::rgb565(180, 0, 0)
+                       : red ? cfg::rgb565(180, 0, 0) : cfg::rgb565(35, 0, 0));
+  c.setTextColor(cfg::Colors::WHITE);
+  c.setFont(&FreeSans12pt7b);
+  printCentered(blocked ? "AUS GESPERRT" : "Achtung", 85);
+  if (blocked) {
+    printCentered("Lauf aktiv", 135);
+    c.setFont(&FreeSans9pt7b);
+    printCentered("Loslassen", 180);
+  } else {
+    printCentered("Ausschalten", 130);
+    c.setFont(&FreeSans9pt7b);
+    char countdown[24];
+    snprintf(countdown, sizeof(countdown), "in %u Sekunden", secondsRemaining);
+    printCentered(countdown, 170);
+    printCentered("Loslassen = Abbruch", 205);
+  }
+  display::flush();
+}
+
 void drawTriggerWarning(bool overflow, size_t queued) {
   if (!display::ready()) return;
   GFXcanvas16& c = display::canvas();
